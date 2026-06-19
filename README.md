@@ -1,5 +1,8 @@
 # Krystal Quorum
 
+[![CI](https://github.com/KrystalUnity/krystal-quorum/actions/workflows/ci.yml/badge.svg)](https://github.com/KrystalUnity/krystal-quorum/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Review the plan before your AI coding agent creates the mess.
 
 Krystal Quorum is a local CLI that reviews markdown implementation plans with one or more independent reviewers, then writes a reconciled human-triage summary. It is designed for developers using AI coding agents who want to catch vague requirements, missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps, and test gaps before code is written.
@@ -9,11 +12,35 @@ Krystal Quorum is not an agent runtime and not a code generator. It is a review 
 ## Quickstart
 
 ```bash
+git clone https://github.com/KrystalUnity/krystal-quorum.git
+cd krystal-quorum
 python -m pip install -e ".[dev]"
 krystal-quorum review examples/bad-plan.md --reviewers mock
 ```
 
 The command writes an append-only review run under `.krystal-quorum/reviews/`.
+
+## 60-Second Demo
+
+Run the no-key mock reviewer against the deliberately weak example plan:
+
+```bash
+krystal-quorum review examples/bad-plan.md --reviewers mock
+```
+
+Example output:
+
+```json
+{
+  "verdict": "REVISE",
+  "confidence": 0.9,
+  "reviewers_used": ["mock"],
+  "output_dir": ".krystal-quorum/reviews/bad-plan_20260619-102618"
+}
+```
+
+`REVISE` exits with code `1`, so CI scripts can fail fast when a plan needs
+work. Review artifacts are written locally and ignored by git.
 
 ## Reviewers
 
@@ -101,3 +128,7 @@ krystal-quorum review plan.md --reviewers ollama:model-a,openai:model-b --round2
 - `3`: runtime or configuration error
 
 Reviewer outputs are advisory. A human should triage the findings before implementation.
+
+## License
+
+Apache-2.0.
