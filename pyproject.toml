@@ -1,0 +1,28 @@
+[project]
+name = "krystal-quorum"
+version = "0.1.0"
+description = "Preflight review for AI coding plans."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27",
+  "pydantic>=2.7",
+  "typer>=0.12",
+]
+
+[project.scripts]
+krystal-quorum = "krystal_quorum.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

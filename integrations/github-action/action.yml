@@ -1,0 +1,19 @@
+name: Krystal Quorum Review
+description: Review a markdown AI coding plan with Krystal Quorum.
+inputs:
+  plan:
+    description: Path to the markdown plan.
+    required: true
+  reviewers:
+    description: Comma-separated reviewer list.
+    required: false
+    default: mock
+runs:
+  using: composite
+  steps:
+    - name: Install Krystal Quorum
+      shell: bash
+      run: python -m pip install .
+    - name: Run Krystal Quorum
+      shell: bash
+      run: krystal-quorum review "${{ inputs.plan }}" --reviewers "${{ inputs.reviewers }}"
