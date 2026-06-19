@@ -46,7 +46,7 @@ def build_summary(result: ReconciledVerdict) -> str:
     ]
     if result.abstained_reviewers:
         lines.append(f"Abstained: `{', '.join(result.abstained_reviewers)}`\n\n")
-    lines.extend(_issue_lines("Consensus Blockers", result.consensus_blocking_issues))
+    lines.extend(_issue_lines("Shared Blockers", result.shared_blocking_issues))
     lines.extend(_issue_lines("Singleton Blockers", result.singleton_blocking_issues))
     lines.append("## Human Triage\n\n")
     if result.unresolved_for_human:

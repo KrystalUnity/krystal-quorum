@@ -34,14 +34,14 @@ def _group_issues(outputs: list[ReviewerOutput]) -> tuple[list[ReviewIssue], lis
                 grouped[key] = (issue, set())
             grouped[key][1].add(output.reviewer)
 
-    consensus: list[ReviewIssue] = []
+    shared: list[ReviewIssue] = []
     singletons: list[ReviewIssue] = []
     for issue, reviewers in grouped.values():
         if len(reviewers) >= 2:
-            consensus.append(issue)
+            shared.append(issue)
         else:
             singletons.append(issue)
-    return consensus, singletons
+    return shared, singletons
 
 
 def _find_contradictions(outputs: list[ReviewerOutput]) -> list[ContradictionFinding]:
@@ -83,13 +83,13 @@ def reconcile(
     non_abstained = [output for output in outputs if output.verdict != Verdict.ABSTAIN]
     abstained = [output.reviewer for output in outputs if output.verdict == Verdict.ABSTAIN]
 
-    consensus, singletons = _group_issues(non_abstained)
+    shared, singletons = _group_issues(non_abstained)
     contradictions = _find_contradictions(non_abstained)
 
     verdicts = [output.verdict for output in non_abstained]
     if not non_abstained:
         merged = Verdict.REVISE
-    elif consensus or Verdict.BLOCK in verdicts:
+    elif shared or Verdict.BLOCK in verdicts:
         merged = Verdict.BLOCK
     elif singletons or contradictions or Verdict.REVISE in verdicts:
         merged = Verdict.REVISE
@@ -113,7 +113,7 @@ def reconcile(
         abstained_reviewers=abstained,
         merged_verdict=merged,
         confidence=confidence,
-        consensus_blocking_issues=consensus,
+        shared_blocking_issues=shared,
         singleton_blocking_issues=singletons,
         contradictions=contradictions,
         unresolved_for_human=unresolved,

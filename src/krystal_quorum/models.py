@@ -65,7 +65,7 @@ class ReconciledVerdict(StrictModel):
     abstained_reviewers: list[str]
     merged_verdict: Verdict
     confidence: float
-    consensus_blocking_issues: list[ReviewIssue]
+    shared_blocking_issues: list[ReviewIssue]
     singleton_blocking_issues: list[ReviewIssue]
     contradictions: list[ContradictionFinding]
     unresolved_for_human: list[str]

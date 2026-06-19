@@ -4,7 +4,7 @@ Review the plan before your AI coding agent creates the mess.
 
 Krystal Quorum is a local CLI that reviews markdown implementation plans with one or more independent reviewers, then writes a reconciled human-triage summary. It is designed for developers using AI coding agents who want to catch vague requirements, missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps, and test gaps before code is written.
 
-Krystal Quorum is not an agent orchestrator and not a code generator. It is the review gate before implementation.
+Krystal Quorum is not an agent runtime and not a code generator. It is a review step before implementation.
 
 ## Quickstart
 
@@ -80,7 +80,7 @@ krystal-quorum review plan.md --reviewers openai:your-model
 
 ### Multiple Reviewers
 
-Pass a comma-separated reviewer list to create a small quorum:
+Pass a comma-separated reviewer list to compare independent model reviews:
 
 ```bash
 krystal-quorum review plan.md --reviewers ollama:model-a,openai:model-b

@@ -18,7 +18,7 @@ def output(reviewer: str, verdict: Verdict, issue: ReviewIssue | None = None) ->
     )
 
 
-def test_reconcile_rejects_consensus_blocker():
+def test_reconcile_rejects_shared_blocker():
     issue = ReviewIssue(id="B1", section="Acceptance", claim="Missing exit codes", evidence="none")
 
     result = reconcile(
@@ -30,7 +30,7 @@ def test_reconcile_rejects_consensus_blocker():
     )
 
     assert result.merged_verdict == Verdict.BLOCK
-    assert len(result.consensus_blocking_issues) == 1
+    assert len(result.shared_blocking_issues) == 1
 
 
 def test_reconcile_revises_singleton_blocker():

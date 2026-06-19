@@ -12,6 +12,6 @@ Use this skill before implementing a non-trivial, high-risk, or underspecified c
 3. Read the generated `summary.md`.
 4. Treat reviewer findings as advisory signals, not approval or rejection by themselves.
 5. Revise material issues before coding.
-6. Ask the operator before implementation when the verdict is `REVISE` or `BLOCK`.
+6. Ask the user before implementation when the verdict is `REVISE` or `BLOCK`.
 
 Do not use reviewer output as permission to deploy, migrate, delete, send messages, or expand scope.
