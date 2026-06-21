@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timezone
 from statistics import mean
+import re
 
 from krystal_quorum.models import (
     ClauseStatus,
@@ -25,18 +26,68 @@ def _fingerprint(issue: ReviewIssue) -> str:
     return " ".join(issue.claim.lower().split())[:80]
 
 
+STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "be",
+    "but",
+    "by",
+    "for",
+    "from",
+    "has",
+    "have",
+    "in",
+    "is",
+    "it",
+    "lacks",
+    "missing",
+    "no",
+    "not",
+    "of",
+    "on",
+    "or",
+    "plan",
+    "the",
+    "to",
+    "with",
+}
+
+
+def _issue_tokens(issue: ReviewIssue) -> set[str]:
+    text = f"{issue.section} {issue.claim}".lower()
+    tokens = set(re.findall(r"[a-z0-9]+", text))
+    return {token for token in tokens if len(token) > 2 and token not in STOPWORDS}
+
+
+def _issues_match(left: ReviewIssue, right: ReviewIssue) -> bool:
+    if _fingerprint(left) == _fingerprint(right):
+        return True
+    left_tokens = _issue_tokens(left)
+    right_tokens = _issue_tokens(right)
+    if not left_tokens or not right_tokens:
+        return False
+    overlap = len(left_tokens & right_tokens)
+    smaller = min(len(left_tokens), len(right_tokens))
+    return overlap >= 3 and overlap / smaller >= 0.5
+
+
 def _group_issues(outputs: list[ReviewerOutput]) -> tuple[list[ReviewIssue], list[ReviewIssue]]:
-    grouped: dict[str, tuple[ReviewIssue, set[str]]] = {}
+    grouped: list[tuple[ReviewIssue, set[str]]] = []
     for output in outputs:
         for issue in output.blocking_issues:
-            key = _fingerprint(issue)
-            if key not in grouped:
-                grouped[key] = (issue, set())
-            grouped[key][1].add(output.reviewer)
+            for grouped_issue, reviewers in grouped:
+                if _issues_match(grouped_issue, issue):
+                    reviewers.add(output.reviewer)
+                    break
+            else:
+                grouped.append((issue, {output.reviewer}))
 
     shared: list[ReviewIssue] = []
     singletons: list[ReviewIssue] = []
-    for issue, reviewers in grouped.values():
+    for issue, reviewers in grouped:
         if len(reviewers) >= 2:
             shared.append(issue)
         else:

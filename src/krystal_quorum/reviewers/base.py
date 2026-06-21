@@ -9,6 +9,16 @@ from pydantic import ValidationError
 
 from krystal_quorum.models import ReviewIssue, ReviewerOutput, Verdict
 
+ISSUE_ALIASES = {
+    "claim": ("claim", "description", "problem", "issue", "summary"),
+    "evidence": ("evidence", "details", "reason", "rationale"),
+}
+SUGGESTION_ALIASES = {
+    "claim": ("claim", "description", "suggestion", "summary"),
+    "rationale": ("rationale", "reason", "why", "evidence", "details"),
+}
+TOP_LEVEL_FIELDS = {"verdict", "confidence", "blocking_issues", "suggestions", "per_clause"}
+
 
 class ReviewerProtocol(Protocol):
     id: str
@@ -102,6 +112,55 @@ def extract_json(raw: str) -> dict[str, Any] | None:
     return None
 
 
+def _first_text(item: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _normalize_issue(item: Any, index: int) -> Any:
+    if not isinstance(item, dict):
+        return item
+    claim = _first_text(item, ISSUE_ALIASES["claim"])
+    evidence = _first_text(item, ISSUE_ALIASES["evidence"])
+    return {
+        "id": str(item.get("id") or f"B{index + 1}"),
+        "section": str(item.get("section") or "general"),
+        "claim": claim,
+        "evidence": evidence,
+    }
+
+
+def _normalize_suggestion(item: Any, index: int) -> Any:
+    if not isinstance(item, dict):
+        return item
+    claim = _first_text(item, SUGGESTION_ALIASES["claim"])
+    rationale = _first_text(item, SUGGESTION_ALIASES["rationale"])
+    return {
+        "id": str(item.get("id") or f"S{index + 1}"),
+        "section": str(item.get("section") or "general"),
+        "claim": claim,
+        "rationale": rationale,
+    }
+
+
+def normalize_reviewer_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = {key: payload[key] for key in TOP_LEVEL_FIELDS if key in payload}
+    issues = normalized.get("blocking_issues")
+    if isinstance(issues, list):
+        normalized["blocking_issues"] = [
+            _normalize_issue(item, index) for index, item in enumerate(issues)
+        ]
+    suggestions = normalized.get("suggestions")
+    if isinstance(suggestions, list):
+        normalized["suggestions"] = [
+            _normalize_suggestion(item, index) for index, item in enumerate(suggestions)
+        ]
+    return normalized
+
+
 def parse_reviewer_output(
     reviewer: str,
     round_number: int,
@@ -113,6 +172,7 @@ def parse_reviewer_output(
         payload = extract_json(raw_response)
         if payload is None:
             raise ValueError("reviewer output unparseable")
+        payload = normalize_reviewer_payload(payload)
         payload.update(
             {
                 "reviewer": reviewer,
@@ -128,7 +188,7 @@ def parse_reviewer_output(
             reviewer,
             round_number,
             claim="reviewer output unparseable",
-            evidence=raw_response[:500] or str(exc),
+            evidence=f"{exc}\n\nRaw: {raw_response[:300]}"[:500],
             raw_response=raw_response,
             elapsed_seconds=elapsed_seconds,
             retries=retries,

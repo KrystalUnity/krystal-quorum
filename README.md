@@ -164,6 +164,17 @@ before the final reconciliation:
 krystal-quorum review plan.md --reviewers ollama:model-a,openai:model-b --round2
 ```
 
+## Reconciliation Model
+
+Krystal Quorum is safety-biased rather than majority-rule voting. A single
+`BLOCK` verdict blocks the merged result, and a single unresolved blocking issue
+forces at least `REVISE`. When two or more reviewers report substantially
+similar blocking issues, Quorum promotes that finding to a shared blocker.
+
+Reviewers are asked to emit `per_clause` statuses for common plan clauses such
+as acceptance criteria, rollback, tests, and safety assumptions. Contradictory
+clause statuses are surfaced for human triage instead of being averaged away.
+
 ## Exit Codes
 
 - `0`: approve

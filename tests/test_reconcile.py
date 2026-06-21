@@ -33,6 +33,33 @@ def test_reconcile_rejects_shared_blocker():
     assert len(result.shared_blocking_issues) == 1
 
 
+def test_reconcile_groups_paraphrased_shared_issues():
+    issue_a = ReviewIssue(
+        id="B1",
+        section="Acceptance",
+        claim="Missing explicit acceptance criteria for the export button",
+        evidence="No acceptance section was found.",
+    )
+    issue_b = ReviewIssue(
+        id="B2",
+        section="Acceptance",
+        claim="The export button plan lacks defined acceptance criteria",
+        evidence="The plan says to make it look nice but gives no pass/fail checks.",
+    )
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b"],
+        round1_outputs=[output("a", Verdict.REVISE, issue_a), output("b", Verdict.REVISE, issue_b)],
+        round2_outputs=[],
+    )
+
+    assert result.merged_verdict == Verdict.BLOCK
+    assert len(result.shared_blocking_issues) == 1
+    assert result.singleton_blocking_issues == []
+
+
 def test_reconcile_revises_singleton_blocker():
     issue = ReviewIssue(id="B1", section="Acceptance", claim="Missing rollback", evidence="none")
 
