@@ -50,16 +50,56 @@ def fallback_output(
     )
 
 
-def extract_json(raw: str) -> dict[str, Any] | None:
-    match = re.search(r"<json>\s*(\{.*?\})\s*</json>", raw, flags=re.DOTALL | re.IGNORECASE)
-    candidate = match.group(1) if match else raw.strip()
-    if not candidate.startswith("{"):
-        return None
+def _json_object_candidates(raw: str) -> list[str]:
+    candidates: list[str] = []
+    start = raw.find("{")
+    while start != -1:
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(start, len(raw)):
+            char = raw[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidates.append(raw[start : index + 1])
+                    break
+        start = raw.find("{", start + 1)
+    return candidates
+
+
+def _load_json_object(candidate: str) -> dict[str, Any] | None:
     try:
-        parsed = json.loads(candidate)
+        parsed = json.loads(candidate.strip())
     except json.JSONDecodeError:
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+def extract_json(raw: str) -> dict[str, Any] | None:
+    match = re.search(r"<json>\s*(.*?)\s*</json>", raw, flags=re.DOTALL | re.IGNORECASE)
+    direct_candidates = [match.group(1)] if match else [raw]
+    for candidate in direct_candidates:
+        parsed = _load_json_object(candidate)
+        if parsed is not None:
+            return parsed
+        for balanced in _json_object_candidates(candidate):
+            parsed = _load_json_object(balanced)
+            if parsed is not None:
+                return parsed
+    return None
 
 
 def parse_reviewer_output(

@@ -105,6 +105,50 @@ $env:OPENAI_BASE_URL = "http://localhost:1234/v1"
 krystal-quorum review plan.md --reviewers openai:your-model
 ```
 
+### Local Command Reviewers
+
+Use `command:<name>` reviewers when you already have local coding agents or
+review scripts installed. Command reviewers receive the full review prompt on
+stdin and can return the strict reviewer JSON on stdout.
+
+```toml
+# krystal-quorum.toml
+[reviewers.local-codex]
+type = "command"
+command = ["codex", "exec", "--sandbox", "read-only", "--ephemeral", "-"]
+timeout_s = 180
+```
+
+Then run:
+
+```bash
+krystal-quorum review plan.md --config krystal-quorum.toml --reviewers command:local-codex
+```
+
+If a tool writes its final answer to a file, configure `output_file`. This is
+useful for wrappers that start a detached local agent process and collect the
+final review later.
+
+```toml
+[reviewers.local-agent]
+type = "command"
+command = ["bash", "reviewers/local-agent-review.sh"]
+timeout_s = 30
+output_file = ".krystal-quorum/tmp/local-agent-review.json"
+wait_for_output_s = 300
+```
+
+Command reviewers are intentionally generic. They can wrap installed CLIs,
+local scripts, or remote shells. If a command times out, exits without output,
+or returns unparseable text, Krystal Quorum records that reviewer as `ABSTAIN`
+instead of blocking the whole run.
+
+Try the bundled command-reviewer example:
+
+```bash
+krystal-quorum review examples/bad-plan.md --config examples/command-reviewer.toml --reviewers command:example-local
+```
+
 ### Multiple Reviewers
 
 Pass a comma-separated reviewer list to compare independent model reviews:

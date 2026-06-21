@@ -16,6 +16,19 @@ def test_parse_reviewer_json_from_tags():
     assert output.verdict == Verdict.APPROVE
 
 
+def test_parse_reviewer_json_from_noisy_stdout():
+    raw = (
+        "booting local reviewer...\n"
+        '{"verdict":"REVISE","confidence":0.7,'
+        '"blocking_issues":[],"suggestions":[],"per_clause":{}}\n'
+        "resume this session with: reviewer --continue abc123\n"
+    )
+
+    output = parse_reviewer_output("command:local", 1, raw, elapsed_seconds=0.2, retries=0)
+
+    assert output.verdict == Verdict.REVISE
+
+
 def test_unparseable_output_abstains():
     output = parse_reviewer_output("mock", 1, "not json", elapsed_seconds=0.1, retries=0)
 

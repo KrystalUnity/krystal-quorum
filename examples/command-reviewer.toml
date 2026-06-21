@@ -1,0 +1,5 @@
+[reviewers.example-local]
+type = "command"
+command = ["python", "command-reviewer.py"]
+cwd = "."
+timeout_s = 30

@@ -58,6 +58,11 @@ async def _run_review(
 def review(
     plan: Path,
     reviewers: str = typer.Option("mock", help="Comma-separated reviewer list."),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help="Optional krystal-quorum TOML config for command reviewers.",
+    ),
     out_dir: Path = typer.Option(
         Path(".krystal-quorum/reviews"),
         help="Directory where review runs are written.",
@@ -69,7 +74,7 @@ def review(
         typer.echo(f"Plan not found: {plan}", err=True)
         raise typer.Exit(3)
     try:
-        reviewer_instances = build_reviewers(reviewers)
+        reviewer_instances = build_reviewers(reviewers, config_path=config)
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(3) from exc
