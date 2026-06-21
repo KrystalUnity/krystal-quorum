@@ -64,6 +64,10 @@ after `ollama:`:
 krystal-quorum review plan.md --reviewers ollama:qwen2.5:14b
 ```
 
+Prefer instruct-tuned models for reviewer adapters. Reasoning-heavy models can
+spend most of the default timeout on internal thinking and may abstain if they
+do not return the strict JSON contract in time.
+
 If Ollama is running somewhere other than `http://localhost:11434`, set
 `OLLAMA_BASE_URL`:
 

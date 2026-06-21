@@ -2,10 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from krystal_quorum.models import ReconciledVerdict, ReviewIssue
+
+UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.-]+")
+WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
 
 
 def plan_sha256(plan_text: str) -> str:
@@ -22,6 +33,17 @@ def _run_dir(out_dir: Path, plan_path: Path) -> Path:
         candidate = out_dir / f"{stem}_{stamp}_{suffix}"
     candidate.mkdir(parents=True)
     return candidate
+
+
+def _reviewer_filename(reviewer: str) -> str:
+    safe = UNSAFE_FILENAME_CHARS.sub("_", reviewer).strip("._-") or "reviewer"
+    safe = safe[:80].rstrip("._-") or "reviewer"
+    if safe.upper() in WINDOWS_RESERVED_NAMES:
+        safe = f"{safe}_reviewer"
+    if safe != reviewer:
+        digest = hashlib.sha256(reviewer.encode("utf-8")).hexdigest()[:8]
+        safe = f"{safe}_{digest}"
+    return f"{safe}.json"
 
 
 def _issue_lines(title: str, issues: list[ReviewIssue]) -> list[str]:
@@ -75,7 +97,7 @@ def persist_run(
     round1_dir = run_dir / "round1"
     round1_dir.mkdir()
     for output in result.round1_outputs:
-        (round1_dir / f"{output.reviewer}.json").write_text(
+        (round1_dir / _reviewer_filename(output.reviewer)).write_text(
             json.dumps(output.model_dump(mode="json"), indent=2),
             encoding="utf-8",
         )
@@ -83,7 +105,7 @@ def persist_run(
         round2_dir = run_dir / "round2"
         round2_dir.mkdir()
         for output in result.round2_outputs:
-            (round2_dir / f"{output.reviewer}.json").write_text(
+            (round2_dir / _reviewer_filename(output.reviewer)).write_text(
                 json.dumps(output.model_dump(mode="json"), indent=2),
                 encoding="utf-8",
             )
