@@ -34,17 +34,22 @@ async def _run_review(
     plan_path: Path,
     reviewers: list[ReviewerProtocol],
     run_round2: bool,
+    plan_text: str | None = None,
 ) -> ReconciledVerdict:
-    plan_text = plan_path.read_text(encoding="utf-8")
+    plan_text = plan_text if plan_text is not None else plan_path.read_text(encoding="utf-8")
     round1_outputs = await asyncio.gather(
         *(reviewer.review_round1(plan_text, timeout_s=120) for reviewer in reviewers)
     )
     round2_outputs = []
     if run_round2:
-        for reviewer in reviewers:
-            round2_outputs.append(
-                await reviewer.review_round2(plan_text, list(round1_outputs), timeout_s=180)
+        round2_outputs = list(
+            await asyncio.gather(
+                *(
+                    reviewer.review_round2(plan_text, list(round1_outputs), timeout_s=180)
+                    for reviewer in reviewers
+                )
             )
+        )
     return reconcile(
         plan_path=str(plan_path),
         plan_text=plan_text,
@@ -79,8 +84,9 @@ def review(
         typer.echo(str(exc), err=True)
         raise typer.Exit(3) from exc
 
-    result = asyncio.run(_run_review(plan, reviewer_instances, round2))
-    run_dir = persist_run(out_dir, plan, plan.read_text(encoding="utf-8"), result)
+    plan_text = plan.read_text(encoding="utf-8")
+    result = asyncio.run(_run_review(plan, reviewer_instances, round2, plan_text=plan_text))
+    run_dir = persist_run(out_dir, plan, plan_text, result)
     typer.echo(
         json.dumps(
             {
