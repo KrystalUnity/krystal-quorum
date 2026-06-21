@@ -18,6 +18,11 @@ SUGGESTION_ALIASES = {
     "rationale": ("rationale", "reason", "why", "evidence", "details"),
 }
 TOP_LEVEL_FIELDS = {"verdict", "confidence", "blocking_issues", "suggestions", "per_clause"}
+PARSE_RETRIES = 1
+PARSE_RETRY_INSTRUCTION = (
+    "\n\nYour previous response could not be parsed as the required strict JSON. "
+    "Retry once and return only the required <json>...</json> object."
+)
 
 
 class ReviewerProtocol(Protocol):
@@ -193,6 +198,27 @@ def parse_reviewer_output(
             elapsed_seconds=elapsed_seconds,
             retries=retries,
         )
+
+
+def is_parse_failure(output: ReviewerOutput) -> bool:
+    return (
+        output.verdict == Verdict.ABSTAIN
+        and bool(output.blocking_issues)
+        and output.blocking_issues[0].id == "B0"
+        and "output unparseable" in output.blocking_issues[0].claim
+    )
+
+
+def retry_prompt(prompt: str) -> str:
+    return f"{prompt}{PARSE_RETRY_INSTRUCTION}"
+
+
+def combined_raw_attempts(raw_attempts: list[str]) -> str:
+    if len(raw_attempts) <= 1:
+        return raw_attempts[0] if raw_attempts else ""
+    return "\n\n".join(
+        f"--- attempt {index} ---\n{raw}" for index, raw in enumerate(raw_attempts, start=1)
+    )
 
 
 def elapsed_since(start: float) -> float:

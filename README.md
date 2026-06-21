@@ -52,6 +52,10 @@ Krystal Quorum is bring-your-own-LLM. The CLI sends the plan text to each
 configured reviewer, asks for strict JSON, then reconciles the responses into
 one human-triage summary.
 
+If a reviewer returns malformed text instead of the strict JSON contract,
+Krystal Quorum retries that reviewer once with a JSON-only reminder. The final
+artifact records the retry count and preserves raw text from both attempts.
+
 Use the mock reviewer first to prove the workflow works. It uses no network and
 requires no keys:
 
@@ -148,8 +152,8 @@ wait_for_output_s = 300
 
 Command reviewers are intentionally generic. They can wrap installed CLIs,
 local scripts, or remote shells. If a command times out, exits without output,
-or returns unparseable text, Krystal Quorum records that reviewer as `ABSTAIN`
-instead of blocking the whole run.
+or still returns unparseable text after the one-shot parse retry, Krystal
+Quorum records that reviewer as `ABSTAIN` instead of blocking the whole run.
 
 Try the bundled command-reviewer example:
 

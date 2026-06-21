@@ -7,7 +7,15 @@ import httpx
 
 from krystal_quorum.models import ReviewerOutput
 from krystal_quorum.prompts import round1_prompt, round2_prompt
-from krystal_quorum.reviewers.base import elapsed_since, fallback_output, parse_reviewer_output
+from krystal_quorum.reviewers.base import (
+    PARSE_RETRIES,
+    combined_raw_attempts,
+    elapsed_since,
+    fallback_output,
+    is_parse_failure,
+    parse_reviewer_output,
+    retry_prompt,
+)
 
 
 class OllamaReviewer:
@@ -34,32 +42,48 @@ class OllamaReviewer:
 
     async def _review(self, prompt: str, round_number: int, timeout_s: int) -> ReviewerOutput:
         start = time.monotonic()
-        try:
-            async with httpx.AsyncClient(transport=self.transport, timeout=timeout_s) as client:
-                response = await client.post(
-                    f"{self.base_url}/api/chat",
-                    json={
-                        "model": self.model,
-                        "stream": False,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
+        raw_attempts: list[str] = []
+        for retries in range(PARSE_RETRIES + 1):
+            attempt_prompt = prompt if retries == 0 else retry_prompt(prompt)
+            try:
+                async with httpx.AsyncClient(transport=self.transport, timeout=timeout_s) as client:
+                    response = await client.post(
+                        f"{self.base_url}/api/chat",
+                        json={
+                            "model": self.model,
+                            "stream": False,
+                            "messages": [{"role": "user", "content": attempt_prompt}],
+                        },
+                    )
+                    response.raise_for_status()
+                    raw = self._extract_text(response.json())
+            except Exception as exc:
+                return fallback_output(
+                    self.id,
+                    round_number,
+                    claim=f"reviewer request failed: {type(exc).__name__}",
+                    evidence=str(exc),
+                    elapsed_seconds=elapsed_since(start),
+                    retries=retries,
                 )
-                response.raise_for_status()
-                raw = self._extract_text(response.json())
-        except Exception as exc:
-            return fallback_output(
+            raw_attempts.append(raw)
+            output = parse_reviewer_output(
                 self.id,
                 round_number,
-                claim=f"reviewer request failed: {type(exc).__name__}",
-                evidence=str(exc),
+                raw,
                 elapsed_seconds=elapsed_since(start),
+                retries=retries,
             )
-        return parse_reviewer_output(
+            if len(raw_attempts) > 1:
+                output.raw_response = combined_raw_attempts(raw_attempts)
+            if not is_parse_failure(output) or retries >= PARSE_RETRIES:
+                return output
+        return fallback_output(
             self.id,
             round_number,
-            raw,
+            claim="reviewer retry loop exhausted",
             elapsed_seconds=elapsed_since(start),
-            retries=0,
+            retries=PARSE_RETRIES,
         )
 
     def _extract_text(self, payload: dict[str, Any]) -> str:

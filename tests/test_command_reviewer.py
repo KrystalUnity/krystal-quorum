@@ -114,6 +114,47 @@ async def test_command_reviewer_extracts_json_from_noisy_stdout(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_command_reviewer_retries_once_when_output_is_malformed(tmp_path):
+    state = tmp_path / "attempts.txt"
+    script = _write_script(
+        tmp_path,
+        """
+        import json
+        import sys
+        from pathlib import Path
+
+        sys.stdin.read()
+        state = Path(sys.argv[1])
+        attempts = int(state.read_text(encoding="utf-8")) if state.exists() else 0
+        state.write_text(str(attempts + 1), encoding="utf-8")
+        if attempts == 0:
+            print("not json")
+        else:
+            print(json.dumps({
+                "verdict": "APPROVE",
+                "confidence": 0.9,
+                "blocking_issues": [],
+                "suggestions": [],
+                "per_clause": {}
+            }))
+        """,
+    )
+    config = _write_config(
+        tmp_path,
+        name="flaky",
+        command=[sys.executable, str(script), str(state)],
+    )
+    reviewer = build_reviewers("command:flaky", config_path=config)[0]
+
+    output = await reviewer.review_round1("plan", timeout_s=5)
+
+    assert output.verdict == Verdict.APPROVE
+    assert output.retries == 1
+    assert state.read_text(encoding="utf-8") == "2"
+    assert "not json" in output.raw_response
+
+
+@pytest.mark.asyncio
 async def test_command_reviewer_reads_json_from_output_file(tmp_path):
     output_file = tmp_path / "review.json"
     script = _write_script(
