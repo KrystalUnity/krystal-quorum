@@ -48,11 +48,13 @@ def _build_report(reviewers: list[ReviewerFamily]) -> DiversityReport:
 
     shared = {family: ids for family, ids in by_family.items() if len(ids) >= 2}
     if shared:
-        family, ids = sorted(shared.items())[0]
+        shared_reasons = [
+            f"{family}: {', '.join(ids)}" for family, ids in sorted(shared.items())
+        ]
         return DiversityReport(
             status="low",
             reviewers=reviewers,
-            reason=f"shared family {family}: {', '.join(ids)}",
+            reason=f"shared families: {'; '.join(shared_reasons)}",
         )
     return DiversityReport(status="ok", reviewers=reviewers)
 

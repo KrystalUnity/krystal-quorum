@@ -8,8 +8,7 @@ import typer
 
 from krystal_quorum.config import build_reviewers
 from krystal_quorum.diversity import analyze_reviewer_objects
-from krystal_quorum.models import DiversityReport
-from krystal_quorum.models import ReconciledVerdict, Verdict
+from krystal_quorum.models import DiversityReport, ReconciledVerdict, Verdict
 from krystal_quorum.persist import persist_run
 from krystal_quorum.reconcile import reconcile
 from krystal_quorum.reviewers.base import ReviewerProtocol
@@ -115,10 +114,17 @@ def review(
         "confidence": result.confidence,
         "reviewers_used": result.reviewers_used,
         "diversity": result.diversity.status,
+        "diversity_reason": result.diversity.reason,
+        "diversity_reviewers": [
+            reviewer.model_dump(mode="json") for reviewer in result.diversity.reviewers
+        ],
         "output_dir": str(run_dir),
     }
     if result.round2_delta is not None:
         output["round2_delta"] = result.round2_delta
+        output["round2_comparisons"] = [
+            comparison.model_dump(mode="json") for comparison in result.round2_comparisons
+        ]
     typer.echo(json.dumps(output, indent=2))
     raise typer.Exit(_exit_code(result.merged_verdict))
 

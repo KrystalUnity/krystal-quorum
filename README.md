@@ -37,6 +37,8 @@ Example output:
   "confidence": 0.9,
   "reviewers_used": ["mock"],
   "diversity": "ok",
+  "diversity_reason": null,
+  "diversity_reviewers": [{"reviewer": "mock", "backend": "mock", "family": "mock"}],
   "output_dir": ".krystal-quorum/reviews/bad-plan_20260619-102618"
 }
 ```
@@ -172,6 +174,8 @@ krystal-quorum review plan.md --reviewers ollama:model-a,openai:model-b --round2
 
 Round 2 artifacts include `round2_delta` and per-reviewer before/after verdicts
 so you can see whether cross-audit changed any reviewer positions.
+When `--round2` is used, the short CLI JSON also includes `round2_comparisons`
+for scripts that do not read the full artifact directory.
 
 ### Reviewer Diversity
 

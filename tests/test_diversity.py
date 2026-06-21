@@ -23,6 +23,21 @@ def test_diversity_low_for_duplicate_ollama_size_variants():
     assert report.status == "low"
 
 
+def test_diversity_reason_lists_all_shared_families():
+    report = analyze_reviewer_diversity(
+        [
+            "ollama:qwen2.5:14b",
+            "ollama:qwen2.5:32b",
+            "openai:gpt-4.1",
+            "openai:gpt-4.1-mini",
+        ]
+    )
+
+    assert report.status == "low"
+    assert "qwen2.5" in report.reason
+    assert "gpt-4.1" in report.reason
+
+
 def test_reviewer_family_strips_common_tags_and_profiles():
     assert reviewer_family("ollama:deepseek-v4-pro:cloud").family == "deepseek-v4"
     assert reviewer_family("ollama:igorls/gemma-4-12B-it-heretic-GGUF:latest").family == (

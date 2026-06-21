@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 
 import pytest
@@ -128,6 +129,42 @@ def test_review_command_can_require_reviewer_diversity(tmp_path):
     assert "reviewer diversity is low" in result.output
 
 
+def test_review_command_can_require_command_reviewer_family_override(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Acceptance\n- Works", encoding="utf-8")
+    config = tmp_path / "krystal-quorum.toml"
+    config.write_text(
+        """
+        [reviewers.local-a]
+        type = "command"
+        command = ["python", "-c", "print('{}')"]
+        family = "same-local"
+
+        [reviewers.local-b]
+        type = "command"
+        command = ["python", "-c", "print('{}')"]
+        family = "same-local"
+        """,
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--config",
+            str(config),
+            "--reviewers",
+            "command:local-a,command:local-b",
+            "--require-diversity",
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert "same-local" in result.output
+
+
 def test_review_command_outputs_diversity_and_schema_version(tmp_path):
     plan = tmp_path / "plan.md"
     plan.write_text("## Acceptance\n- Works", encoding="utf-8")
@@ -137,3 +174,45 @@ def test_review_command_outputs_diversity_and_schema_version(tmp_path):
     assert result.exit_code == 0
     assert '"schema_version": "1.1"' in result.output
     assert '"diversity": "ok"' in result.output
+
+
+def test_review_command_outputs_diversity_reason_and_round2_comparisons(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Acceptance\n- Works", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "mock,mock",
+            "--round2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["diversity"] == "low"
+    assert "mock" in payload["diversity_reason"]
+    assert payload["diversity_reviewers"] == [
+        {"reviewer": "mock", "backend": "mock", "family": "mock"},
+        {"reviewer": "mock", "backend": "mock", "family": "mock"},
+    ]
+    assert payload["round2_delta"] == 0
+    assert payload["round2_comparisons"] == [
+        {
+            "reviewer": "mock",
+            "round1": "APPROVE",
+            "round2": "APPROVE",
+            "comparable": True,
+            "changed": False,
+        },
+        {
+            "reviewer": "mock",
+            "round1": "APPROVE",
+            "round2": "APPROVE",
+            "comparable": True,
+            "changed": False,
+        },
+    ]
