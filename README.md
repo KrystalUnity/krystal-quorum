@@ -32,9 +32,11 @@ Example output:
 
 ```json
 {
+  "schema_version": "1.1",
   "verdict": "REVISE",
   "confidence": 0.9,
   "reviewers_used": ["mock"],
+  "diversity": "ok",
   "output_dir": ".krystal-quorum/reviews/bad-plan_20260619-102618"
 }
 ```
@@ -166,6 +168,35 @@ before the final reconciliation:
 
 ```bash
 krystal-quorum review plan.md --reviewers ollama:model-a,openai:model-b --round2
+```
+
+Round 2 artifacts include `round2_delta` and per-reviewer before/after verdicts
+so you can see whether cross-audit changed any reviewer positions.
+
+### Reviewer Diversity
+
+Krystal Quorum reports reviewer diversity in both CLI output and persisted
+artifacts. Diversity is `low` when any two reviewers resolve to the same model
+family, such as `openai:gpt-4.1` and `openai:gpt-4.1-mini`, or
+`ollama:qwen2.5:14b` and `ollama:qwen2.5:32b`.
+
+Use `--require-diversity` to fail closed before review when reviewers are too
+correlated:
+
+```bash
+krystal-quorum review plan.md \
+  --reviewers ollama:qwen2.5:14b,ollama:qwen2.5:32b \
+  --require-diversity
+```
+
+Command reviewers use the command name as their family by default. You can
+override that in config:
+
+```toml
+[reviewers.local-agent-a]
+type = "command"
+command = ["bash", "reviewers/a.sh"]
+family = "local-agent"
 ```
 
 ## Reconciliation Model

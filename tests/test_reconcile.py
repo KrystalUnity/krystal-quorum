@@ -2,10 +2,16 @@ from krystal_quorum.models import ClauseStatus, ReviewIssue, ReviewerOutput, Ver
 from krystal_quorum.reconcile import reconcile
 
 
-def output(reviewer: str, verdict: Verdict, issue: ReviewIssue | None = None) -> ReviewerOutput:
+def output(
+    reviewer: str,
+    verdict: Verdict,
+    issue: ReviewIssue | None = None,
+    *,
+    round_number: int = 1,
+) -> ReviewerOutput:
     return ReviewerOutput(
         reviewer=reviewer,
-        round=1,
+        round=round_number,  # type: ignore[arg-type]
         verdict=verdict,
         confidence=0.8,
         blocking_issues=[issue] if issue else [],
@@ -90,3 +96,55 @@ def test_reconcile_ignores_abstained_reviewer_confidence():
     assert result.merged_verdict == Verdict.APPROVE
     assert result.confidence == 0.8
     assert result.abstained_reviewers == ["b"]
+
+
+def test_reconcile_keeps_single_block_fail_safe_with_majority_approve():
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b", "c"],
+        round1_outputs=[
+            output("a", Verdict.BLOCK),
+            output("b", Verdict.APPROVE),
+            output("c", Verdict.APPROVE),
+        ],
+        round2_outputs=[],
+    )
+
+    assert result.merged_verdict == Verdict.BLOCK
+
+
+def test_reconcile_reports_round2_delta_for_comparable_verdict_changes():
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b", "c"],
+        round1_outputs=[
+            output("a", Verdict.APPROVE),
+            output("b", Verdict.ABSTAIN),
+            output("c", Verdict.REVISE),
+        ],
+        round2_outputs=[
+            output("a", Verdict.BLOCK, round_number=2),
+            output("b", Verdict.APPROVE, round_number=2),
+            output("c", Verdict.REVISE, round_number=2),
+        ],
+    )
+
+    assert result.round2_delta == 1
+    assert result.round2_comparisons[0].changed is True
+    assert result.round2_comparisons[1].comparable is False
+    assert result.round2_comparisons[1].changed is None
+    assert result.round2_comparisons[2].changed is False
+
+
+def test_reconcile_includes_schema_version():
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a"],
+        round1_outputs=[output("a", Verdict.APPROVE)],
+        round2_outputs=[],
+    )
+
+    assert result.schema_version == "1.1"

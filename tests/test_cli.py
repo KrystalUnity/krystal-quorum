@@ -107,3 +107,33 @@ def test_review_command_reads_plan_once(tmp_path, monkeypatch):
 
     assert result.exit_code == 0
     assert read_count == 1
+
+
+def test_review_command_can_require_reviewer_diversity(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Acceptance\n- Works", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "ollama:qwen2.5:14b,ollama:qwen2.5:32b",
+            "--require-diversity",
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert "reviewer diversity is low" in result.output
+
+
+def test_review_command_outputs_diversity_and_schema_version(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Acceptance\n- Works", encoding="utf-8")
+
+    result = CliRunner().invoke(app, ["review", str(plan), "--reviewers", "mock"])
+
+    assert result.exit_code == 0
+    assert '"schema_version": "1.1"' in result.output
+    assert '"diversity": "ok"' in result.output

@@ -62,10 +62,14 @@ def _issue_lines(title: str, issues: list[ReviewIssue]) -> list[str]:
 def build_summary(result: ReconciledVerdict) -> str:
     lines = [
         "# Krystal Quorum Review Summary\n\n",
+        f"Schema: `{result.schema_version}`\n\n",
         f"Verdict: **{result.merged_verdict.value}**\n\n",
         f"Confidence: `{result.confidence:.2f}`\n\n",
         f"Reviewers: `{', '.join(result.reviewers_used)}`\n\n",
+        f"Diversity: `{result.diversity.status}`\n\n",
     ]
+    if result.round2_delta is not None:
+        lines.append(f"Round 2 Delta: `{result.round2_delta}`\n\n")
     if result.abstained_reviewers:
         lines.append(f"Abstained: `{', '.join(result.abstained_reviewers)}`\n\n")
     lines.extend(_issue_lines("Shared Blockers", result.shared_blocking_issues))

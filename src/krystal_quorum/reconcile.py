@@ -8,12 +8,18 @@ import re
 from krystal_quorum.models import (
     ClauseStatus,
     ContradictionFinding,
+    DiversityReport,
     ReconciledVerdict,
     ReviewIssue,
+    Round2Comparison,
     ReviewerOutput,
     Verdict,
 )
+from krystal_quorum.diversity import analyze_reviewer_diversity
 from krystal_quorum.persist import plan_sha256
+
+SCHEMA_VERSION = "1.1"
+COMPARABLE_ROUND2_VERDICTS = {Verdict.APPROVE, Verdict.REVISE, Verdict.BLOCK}
 
 
 def _effective_outputs(
@@ -122,6 +128,34 @@ def _find_contradictions(outputs: list[ReviewerOutput]) -> list[ContradictionFin
     return contradictions
 
 
+def _round2_report(
+    reviewers_used: list[str],
+    round1_outputs: list[ReviewerOutput],
+    round2_outputs: list[ReviewerOutput],
+) -> tuple[int | None, list[Round2Comparison]]:
+    if not round2_outputs:
+        return None, []
+    round1_by_reviewer = {output.reviewer: output.verdict for output in round1_outputs}
+    round2_by_reviewer = {output.reviewer: output.verdict for output in round2_outputs}
+
+    comparisons: list[Round2Comparison] = []
+    for reviewer in reviewers_used:
+        round1 = round1_by_reviewer.get(reviewer)
+        round2 = round2_by_reviewer.get(reviewer)
+        comparable = round1 in COMPARABLE_ROUND2_VERDICTS and round2 in COMPARABLE_ROUND2_VERDICTS
+        changed = (round1 != round2) if comparable else None
+        comparisons.append(
+            Round2Comparison(
+                reviewer=reviewer,
+                round1=round1,
+                round2=round2,
+                comparable=comparable,
+                changed=changed,
+            )
+        )
+    return sum(1 for comparison in comparisons if comparison.changed is True), comparisons
+
+
 def reconcile(
     *,
     plan_path: str,
@@ -129,6 +163,7 @@ def reconcile(
     reviewers_used: list[str],
     round1_outputs: list[ReviewerOutput],
     round2_outputs: list[ReviewerOutput],
+    diversity: DiversityReport | None = None,
 ) -> ReconciledVerdict:
     outputs = _effective_outputs(round1_outputs, round2_outputs)
     non_abstained = [output for output in outputs if output.verdict != Verdict.ABSTAIN]
@@ -136,6 +171,11 @@ def reconcile(
 
     shared, singletons = _group_issues(non_abstained)
     contradictions = _find_contradictions(non_abstained)
+    round2_delta, round2_comparisons = _round2_report(
+        reviewers_used,
+        round1_outputs,
+        round2_outputs,
+    )
 
     verdicts = [output.verdict for output in non_abstained]
     if not non_abstained:
@@ -157,10 +197,12 @@ def reconcile(
 
     confidence = mean(output.confidence for output in non_abstained) if non_abstained else 0.0
     return ReconciledVerdict(
+        schema_version=SCHEMA_VERSION,
         plan_path=plan_path,
         plan_sha256=plan_sha256(plan_text),
         timestamp=datetime.now(timezone.utc).isoformat(),
         reviewers_used=reviewers_used,
+        diversity=diversity or analyze_reviewer_diversity(reviewers_used),
         abstained_reviewers=abstained,
         merged_verdict=merged,
         confidence=confidence,
@@ -170,4 +212,6 @@ def reconcile(
         unresolved_for_human=unresolved,
         round1_outputs=round1_outputs,
         round2_outputs=round2_outputs,
+        round2_delta=round2_delta,
+        round2_comparisons=round2_comparisons,
     )

@@ -57,11 +57,33 @@ class ContradictionFinding(StrictModel):
     severity: Literal["high", "medium", "low"]
 
 
+class ReviewerFamily(StrictModel):
+    reviewer: str
+    backend: str
+    family: str
+
+
+class DiversityReport(StrictModel):
+    status: Literal["ok", "low"]
+    reviewers: list[ReviewerFamily]
+    reason: str | None = None
+
+
+class Round2Comparison(StrictModel):
+    reviewer: str
+    round1: Verdict | None
+    round2: Verdict | None
+    comparable: bool
+    changed: bool | None
+
+
 class ReconciledVerdict(StrictModel):
+    schema_version: str
     plan_path: str
     plan_sha256: str
     timestamp: str
     reviewers_used: list[str]
+    diversity: DiversityReport
     abstained_reviewers: list[str]
     merged_verdict: Verdict
     confidence: float
@@ -71,3 +93,5 @@ class ReconciledVerdict(StrictModel):
     unresolved_for_human: list[str]
     round1_outputs: list[ReviewerOutput]
     round2_outputs: list[ReviewerOutput]
+    round2_delta: int | None
+    round2_comparisons: list[Round2Comparison]

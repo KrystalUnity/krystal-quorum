@@ -22,6 +22,7 @@ class CommandReviewer:
         output_file: Path | None = None,
         timeout_s: float | None = None,
         wait_for_output_s: float = 0.0,
+        family: str | None = None,
     ) -> None:
         if not command:
             raise ValueError("command reviewer command must not be empty")
@@ -32,6 +33,7 @@ class CommandReviewer:
         self.output_file = output_file
         self.timeout_s = timeout_s
         self.wait_for_output_s = wait_for_output_s
+        self.family = family
 
     async def review_round1(self, plan_text: str, *, timeout_s: int) -> ReviewerOutput:
         return await self._review(round1_prompt(self.id, plan_text), 1, timeout_s)

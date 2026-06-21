@@ -112,6 +112,7 @@ def _build_command_reviewer(
             "wait_for_output_s",
             default=0.0,
         ),
+        family=_optional_string(reviewer_config.get("family"), "family"),
     )
 
 
@@ -130,3 +131,11 @@ def _optional_number(value: Any, name: str, default: float | None = None) -> flo
     if not isinstance(value, int | float):
         raise ValueError(f"{name} must be a number")
     return float(value)
+
+
+def _optional_string(value: Any, name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a string")
+    return value
