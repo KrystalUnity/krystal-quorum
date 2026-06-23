@@ -1,4 +1,4 @@
-from krystal_quorum.issue_matching import cluster_issues
+from krystal_quorum.issue_matching import cluster_issues, legacy_group_issues
 from krystal_quorum.models import ReviewIssue
 
 
@@ -62,6 +62,18 @@ def test_single_shared_support_term_does_not_create_consensus():
     )
 
     assert shared(clusters) == []
+
+
+def test_legacy_grouping_uses_v03_stopwords():
+    issue_a = issue("B1", "Missing plan no export detail.")
+    issue_b = issue("B2", "Missing plan no rollback detail.")
+
+    shared_issues, singletons = legacy_group_issues(
+        [("agy", issue_a), ("claude", issue_b)]
+    )
+
+    assert shared_issues == []
+    assert [item.id for item in singletons] == ["B1", "B2"]
 
 
 def test_connected_component_joins_by_non_representative_match():

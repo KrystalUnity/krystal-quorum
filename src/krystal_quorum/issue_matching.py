@@ -160,6 +160,35 @@ STOPWORDS = {
     "with",
 }
 
+LEGACY_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "be",
+    "but",
+    "by",
+    "for",
+    "from",
+    "has",
+    "have",
+    "in",
+    "is",
+    "it",
+    "lacks",
+    "missing",
+    "no",
+    "not",
+    "of",
+    "on",
+    "or",
+    "plan",
+    "the",
+    "to",
+    "with",
+}
+
 GENERIC_REVIEW_TERMS = {
     "claim",
     "described",
@@ -450,7 +479,7 @@ def legacy_group_issues(
 def _legacy_issue_tokens(issue: ReviewIssue) -> set[str]:
     text = f"{issue.section} {issue.claim}".lower()
     tokens = set(re.findall(r"[a-z0-9]+", text))
-    return {token for token in tokens if len(token) > 2 and token not in STOPWORDS}
+    return {token for token in tokens if len(token) > 2 and token not in LEGACY_STOPWORDS}
 
 
 def _legacy_issues_match(left: ReviewIssue, right: ReviewIssue) -> bool:
