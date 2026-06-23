@@ -1,0 +1,14 @@
+# OpenAI-compatible reviewers do not require TOML configuration in Krystal Quorum.
+# Select them directly with --reviewers and configure credentials through env vars.
+#
+# Example:
+#
+#   export OPENAI_API_KEY=...
+#   export OPENAI_BASE_URL=https://api.openai.com/v1
+#   krystal-quorum review docs/plans/change.md \
+#     --reviewers openai:gpt-4.1,openai:o4-mini \
+#     --round2 \
+#     --require-diversity
+#
+# For compatible gateways or hosted model routers, set OPENAI_BASE_URL to that
+# server's /v1 endpoint and keep OPENAI_API_KEY in the environment.

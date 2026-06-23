@@ -1,0 +1,13 @@
+# Ollama reviewers do not require TOML configuration in Krystal Quorum.
+# Select them directly with --reviewers and configure the endpoint with OLLAMA_BASE_URL.
+#
+# Example:
+#
+#   OLLAMA_BASE_URL=http://localhost:11434 \
+#   krystal-quorum review docs/plans/change.md \
+#     --reviewers ollama:qwen2.5:14b,ollama:llama3.1:8b \
+#     --round2 \
+#     --require-diversity
+#
+# Prefer instruct-tuned models. Reasoning-heavy models can spend the timeout on
+# thinking and may abstain if they do not return the strict JSON contract.

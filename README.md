@@ -20,6 +20,9 @@ krystal-quorum review examples/bad-plan.md --reviewers mock
 
 The command writes an append-only review run under `.krystal-quorum/reviews/`.
 
+Agent integration packs for Claude Code, Hermes-style runners, OpenClaw-style
+coordinators, and CI live in [docs/agent-integrations.md](docs/agent-integrations.md).
+
 ## 60-Second Demo
 
 Run the no-key mock reviewer against the deliberately weak example plan:

@@ -8,12 +8,52 @@ inputs:
     description: Comma-separated reviewer list.
     required: false
     default: mock
+  config:
+    description: Optional krystal-quorum TOML config path.
+    required: false
+    default: ""
+  out-dir:
+    description: Directory where review artifacts should be written.
+    required: false
+    default: .krystal-quorum/reviews
+  round2:
+    description: Run cross-audit round 2.
+    required: false
+    default: "false"
+  require-diversity:
+    description: Fail when reviewer families are too similar.
+    required: false
+    default: "false"
+  package-spec:
+    description: Python package spec to install. Use "." for local checkout or a pinned release.
+    required: false
+    default: "."
 runs:
   using: composite
   steps:
     - name: Install Krystal Quorum
       shell: bash
-      run: python -m pip install .
+      env:
+        PACKAGE_SPEC: ${{ inputs.package-spec }}
+      run: python -m pip install "$PACKAGE_SPEC"
     - name: Run Krystal Quorum
       shell: bash
-      run: krystal-quorum review "${{ inputs.plan }}" --reviewers "${{ inputs.reviewers }}"
+      env:
+        INPUT_PLAN: ${{ inputs.plan }}
+        INPUT_REVIEWERS: ${{ inputs.reviewers }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_OUT_DIR: ${{ inputs.out-dir }}
+        INPUT_ROUND2: ${{ inputs.round2 }}
+        INPUT_REQUIRE_DIVERSITY: ${{ inputs.require-diversity }}
+      run: |
+        args=(review "$INPUT_PLAN" --reviewers "$INPUT_REVIEWERS" --out-dir "$INPUT_OUT_DIR")
+        if [ -n "$INPUT_CONFIG" ]; then
+          args+=(--config "$INPUT_CONFIG")
+        fi
+        if [ "$INPUT_ROUND2" = "true" ]; then
+          args+=(--round2)
+        fi
+        if [ "$INPUT_REQUIRE_DIVERSITY" = "true" ]; then
+          args+=(--require-diversity)
+        fi
+        krystal-quorum "${args[@]}"

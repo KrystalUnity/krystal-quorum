@@ -1,0 +1,50 @@
+# Copy this file to krystal-quorum.toml and edit commands for tools installed
+# on your machine. These are placeholders only; they do not include private
+# Krystal Unity server paths, credentials, or wrappers.
+#
+# Run with:
+#
+#   krystal-quorum review docs/plans/change.md \
+#     --config krystal-quorum.toml \
+#     --reviewers command:claude,command:codex \
+#     --round2
+
+[reviewers.claude]
+type = "command"
+command = ["bash", "reviewers/claude-review.sh"]
+cwd = "."
+timeout_s = 300
+family = "claude"
+
+[reviewers.codex]
+type = "command"
+command = ["bash", "reviewers/codex-review.sh"]
+cwd = "."
+timeout_s = 300
+family = "codex"
+
+[reviewers.agy]
+type = "command"
+command = ["bash", "reviewers/agy-review.sh"]
+cwd = "."
+timeout_s = 300
+family = "antigravity"
+
+[reviewers.grok]
+type = "command"
+command = ["bash", "reviewers/grok-review.sh"]
+cwd = "."
+timeout_s = 300
+family = "grok"
+
+# Detached wrappers can write strict reviewer JSON to output_file. Quorum will
+# wait for that file when wait_for_output_s is set.
+#
+# [reviewers.local-file-agent]
+# type = "command"
+# command = ["bash", "reviewers/local-file-agent.sh"]
+# cwd = "."
+# timeout_s = 30
+# output_file = ".krystal-quorum/tmp/local-file-agent.json"
+# wait_for_output_s = 300
+# family = "local-agent"
