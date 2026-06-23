@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
+  <title id="title">Krystal Quorum terminal demo</title>
+  <desc id="desc">Animated terminal card showing a weak plan revised and a good plan approved.</desc>
+  <style>
+    .bg { fill: #101418; }
+    .panel { fill: #151b21; stroke: #2d3844; stroke-width: 2; }
+    .bar { fill: #202832; }
+    .text { font: 20px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #e8edf2; }
+    .muted { fill: #98a6b3; }
+    .revise { fill: #ffbc5c; }
+    .approve { fill: #64d68a; }
+    .cursor { fill: #e8edf2; }
+    .line { opacity: 0; animation: show 8s infinite; }
+    .l1 { animation-delay: 0.2s; }
+    .l2 { animation-delay: 1.3s; }
+    .l3 { animation-delay: 2.5s; }
+    .l4 { animation-delay: 4.2s; }
+    .l5 { animation-delay: 5.4s; }
+    .l6 { animation-delay: 6.6s; }
+    .cursor { animation: blink 1s steps(2, start) infinite; }
+    @keyframes show {
+      0%, 8% { opacity: 0; }
+      12%, 90% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes blink {
+      0%, 45% { opacity: 1; }
+      46%, 100% { opacity: 0; }
+    }
+  </style>
+  <rect class="bg" width="900" height="420" rx="16"/>
+  <rect class="panel" x="40" y="38" width="820" height="344" rx="12"/>
+  <rect class="bar" x="40" y="38" width="820" height="48" rx="12"/>
+  <circle cx="74" cy="62" r="7" fill="#ff6b6b"/>
+  <circle cx="98" cy="62" r="7" fill="#ffd166"/>
+  <circle cx="122" cy="62" r="7" fill="#64d68a"/>
+  <text x="150" y="69" class="text muted">krystal-quorum demo</text>
+  <text x="72" y="130" class="text line l1">$ krystal-quorum review examples/bad-plan.md --reviewers mock</text>
+  <text x="72" y="170" class="text line l2">verdict: <tspan class="revise">REVISE</tspan></text>
+  <text x="72" y="210" class="text line l3">issue: missing acceptance criteria</text>
+  <text x="72" y="260" class="text line l4">$ krystal-quorum review examples/good-plan.md --reviewers mock</text>
+  <text x="72" y="300" class="text line l5">verdict: <tspan class="approve">APPROVE</tspan></text>
+  <text x="72" y="340" class="text line l6">artifacts: .krystal-quorum/reviews/...</text>
+  <rect class="cursor" x="430" y="322" width="12" height="24"/>
+</svg>

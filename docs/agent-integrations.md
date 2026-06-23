@@ -6,10 +6,10 @@ reviews a markdown plan before those tools implement it.
 
 ## Install
 
-From a checkout:
+From PyPI:
 
 ```bash
-python -m pip install .
+python -m pip install krystal-quorum
 ```
 
 For development:
@@ -21,7 +21,16 @@ python -m pip install -e ".[dev]"
 Smoke test:
 
 ```bash
+# From a krystal-quorum checkout:
 krystal-quorum review examples/bad-plan.md --reviewers mock
+```
+
+Install project-local agent integration files:
+
+```bash
+krystal-quorum init --target claude-code
+krystal-quorum init --target hermes
+krystal-quorum init --target openclaw
 ```
 
 ## Plan File Shape
@@ -62,15 +71,14 @@ Claude Code skills documentation: <https://docs.anthropic.com/en/docs/claude-cod
 Project-level skill install:
 
 ```bash
-mkdir -p .claude/skills/krystal-quorum-review
-cp integrations/claude-code-skill/SKILL.md .claude/skills/krystal-quorum-review/SKILL.md
+krystal-quorum init --target claude-code
 ```
 
-Optional slash-command style install:
+The command installs both the skill and optional slash-command style file:
 
 ```bash
-mkdir -p .claude/commands
-cp integrations/claude-code-skill/quorum-review.md .claude/commands/quorum-review.md
+.claude/skills/krystal-quorum-review/SKILL.md
+.claude/commands/quorum-review.md
 ```
 
 Typical Claude Code workflow:
@@ -91,8 +99,7 @@ Copy the Hermes skill into the location your Hermes-style runner uses for
 Agent Skills or workflow prompts:
 
 ```bash
-mkdir -p .hermes/skills/krystal-quorum-plan-review
-cp integrations/hermes-skill/SKILL.md .hermes/skills/krystal-quorum-plan-review/SKILL.md
+krystal-quorum init --target hermes
 ```
 
 Recommended command:
@@ -119,8 +126,7 @@ Copy the OpenClaw skill into the skill or prompt directory used by your
 OpenClaw-style coordinator:
 
 ```bash
-mkdir -p .openclaw/skills/krystal-quorum-openclaw-review
-cp integrations/openclaw-skill/SKILL.md .openclaw/skills/krystal-quorum-openclaw-review/SKILL.md
+krystal-quorum init --target openclaw
 ```
 
 Use Quorum before dispatching implementation agents. Attach the Quorum artifact
@@ -178,15 +184,3 @@ Templates live under `integrations/agent-templates/`:
 
 The command-reviewer template intentionally contains placeholder script paths.
 It does not include private Krystal Unity server paths, credentials, or wrappers.
-
-## Future Init Command
-
-A future release may add:
-
-```bash
-krystal-quorum init --target claude-code
-krystal-quorum init --target hermes
-krystal-quorum init --target openclaw
-```
-
-Until then, copy the integration files directly.

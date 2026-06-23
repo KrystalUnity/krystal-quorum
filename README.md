@@ -3,6 +3,12 @@
 [![CI](https://github.com/KrystalUnity/krystal-quorum/actions/workflows/ci.yml/badge.svg)](https://github.com/KrystalUnity/krystal-quorum/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+```text
++-- Krystal Quorum ------------------------+
+| Review the plan before agents edit code. |
++------------------------------------------+
+```
+
 Review the plan before your AI coding agent creates the mess.
 
 Krystal Quorum is a local CLI that reviews markdown implementation plans with one or more independent reviewers, then writes a reconciled human-triage summary. It is designed for developers using AI coding agents who want to catch vague requirements, missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps, and test gaps before code is written.
@@ -12,16 +18,32 @@ Krystal Quorum is not an agent runtime and not a code generator. It is a review 
 ## Quickstart
 
 ```bash
+python -m pip install krystal-quorum
 git clone https://github.com/KrystalUnity/krystal-quorum.git
 cd krystal-quorum
-python -m pip install -e ".[dev]"
 krystal-quorum review examples/bad-plan.md --reviewers mock
 ```
 
-The command writes an append-only review run under `.krystal-quorum/reviews/`.
+If you are already in a checkout, only the install and review commands are
+needed. The command writes an append-only review run under
+`.krystal-quorum/reviews/`.
+
+For development from a checkout:
+
+```bash
+python -m pip install -e ".[dev]"
+```
 
 Agent integration packs for Claude Code, Hermes-style runners, OpenClaw-style
 coordinators, and CI live in [docs/agent-integrations.md](docs/agent-integrations.md).
+
+Install project-local agent skills with:
+
+```bash
+krystal-quorum init --target claude-code
+krystal-quorum init --target hermes
+krystal-quorum init --target openclaw
+```
 
 ## 60-Second Demo
 
@@ -48,6 +70,16 @@ Example output:
 
 `REVISE` exits with code `1`, so CI scripts can fail fast when a plan needs
 work. Review artifacts are written locally and ignored by git.
+
+Now run the fixed plan:
+
+```bash
+krystal-quorum review examples/good-plan.md --reviewers mock
+```
+
+The mock reviewer sees explicit acceptance criteria and returns `APPROVE`
+with exit code `0`. See [docs/demo.md](docs/demo.md) for a short transcript and
+terminal card.
 
 ## Reviewers
 
@@ -237,6 +269,11 @@ v0.4 change.
 Reviewers are asked to emit `per_clause` statuses for common plan clauses such
 as acceptance criteria, rollback, tests, and safety assumptions. Contradictory
 clause statuses are surfaced for human triage instead of being averaged away.
+
+Architecture notes:
+
+- [Consensus matching](docs/architecture/consensus-matching.md)
+- [Local command reviewers](docs/architecture/local-command-reviewers.md)
 
 ## Exit Codes
 

@@ -1,5 +1,6 @@
 # OpenAI-compatible reviewers do not require TOML configuration in Krystal Quorum.
 # Select them directly with --reviewers and configure credentials through env vars.
+[reviewers]
 #
 # Example:
 #

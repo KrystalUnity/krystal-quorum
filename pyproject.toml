@@ -1,14 +1,19 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "krystal-quorum"
-version = "0.4.0"
+version = "0.5.0"
 description = "Preflight review for AI coding plans."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 classifiers = [
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = [
@@ -20,11 +25,29 @@ dependencies = [
 [project.scripts]
 krystal-quorum = "krystal_quorum.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/KrystalUnity/krystal-quorum"
+Repository = "https://github.com/KrystalUnity/krystal-quorum"
+Issues = "https://github.com/KrystalUnity/krystal-quorum/issues"
+
 [project.optional-dependencies]
 dev = [
+  "build>=1.2",
   "pytest>=8.2",
   "pytest-asyncio>=0.23",
   "ruff>=0.5",
+  "twine>=5",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+krystal_quorum = [
+  "templates/agent_integrations/claude-code/.claude/commands/quorum-review.md",
+  "templates/agent_integrations/claude-code/.claude/skills/krystal-quorum-review/SKILL.md",
+  "templates/agent_integrations/hermes/.hermes/skills/krystal-quorum-plan-review/SKILL.md",
+  "templates/agent_integrations/openclaw/.openclaw/skills/krystal-quorum-openclaw-review/SKILL.md",
 ]
 
 [tool.pytest.ini_options]

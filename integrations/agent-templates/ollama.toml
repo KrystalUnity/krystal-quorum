@@ -1,5 +1,6 @@
 # Ollama reviewers do not require TOML configuration in Krystal Quorum.
 # Select them directly with --reviewers and configure the endpoint with OLLAMA_BASE_URL.
+[reviewers]
 #
 # Example:
 #

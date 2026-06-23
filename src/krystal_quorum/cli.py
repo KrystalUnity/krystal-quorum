@@ -8,6 +8,7 @@ import typer
 
 from krystal_quorum.config import build_reviewers
 from krystal_quorum.diversity import analyze_reviewer_objects
+from krystal_quorum.init_command import InitError, install_integration_templates
 from krystal_quorum.models import DiversityReport, ReconciledVerdict, Verdict
 from krystal_quorum.persist import persist_run
 from krystal_quorum.reconcile import reconcile
@@ -127,6 +128,36 @@ def review(
         ]
     typer.echo(json.dumps(output, indent=2))
     raise typer.Exit(_exit_code(result.merged_verdict))
+
+
+@app.command()
+def init(
+    target: str = typer.Option(
+        ...,
+        "--target",
+        help="Integration target: claude-code, hermes, or openclaw.",
+    ),
+    path: Path = typer.Option(
+        Path("."),
+        "--path",
+        help="Project directory where integration files should be installed.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing generated integration files.",
+    ),
+) -> None:
+    """Install project-local agent integration templates."""
+    try:
+        installed = install_integration_templates(target, path, force=force)
+    except InitError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+
+    typer.echo(f"Installed {target} integration templates:")
+    for installed_file in installed:
+        typer.echo(f"- {installed_file}")
 
 
 def main() -> None:
