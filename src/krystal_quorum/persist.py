@@ -59,6 +59,28 @@ def _issue_lines(title: str, issues: list[ReviewIssue]) -> list[str]:
     return lines
 
 
+def _issue_cluster_lines(result: ReconciledVerdict) -> list[str]:
+    lines = ["## Issue Clusters\n\n"]
+    if not result.issue_clusters:
+        lines.append("- None.\n\n")
+        return lines
+    for cluster in result.issue_clusters:
+        status = "shared" if cluster.shared else "singleton"
+        reviewers = ", ".join(cluster.reviewers)
+        lines.append(
+            f"- **{cluster.topic}** ({status}, reviewers: {reviewers}): "
+            f"{cluster.match_reason}\n"
+        )
+        for edge in cluster.edges:
+            lines.append(
+                f"  Edge: `{edge.left_reviewer}:{edge.left_issue_id}` <-> "
+                f"`{edge.right_reviewer}:{edge.right_issue_id}` - {edge.match_reason}\n"
+            )
+        lines.append(f"  Representative: {cluster.representative.claim}\n")
+    lines.append("\n")
+    return lines
+
+
 def build_summary(result: ReconciledVerdict) -> str:
     lines = [
         "# Krystal Quorum Review Summary\n\n",
@@ -74,6 +96,7 @@ def build_summary(result: ReconciledVerdict) -> str:
         lines.append(f"Abstained: `{', '.join(result.abstained_reviewers)}`\n\n")
     lines.extend(_issue_lines("Shared Blockers", result.shared_blocking_issues))
     lines.extend(_issue_lines("Singleton Blockers", result.singleton_blocking_issues))
+    lines.extend(_issue_cluster_lines(result))
     lines.append("## Human Triage\n\n")
     if result.unresolved_for_human:
         for item in result.unresolved_for_human:

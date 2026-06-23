@@ -32,7 +32,7 @@ Example output:
 
 ```json
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "verdict": "REVISE",
   "confidence": 0.9,
   "reviewers_used": ["mock"],
@@ -213,6 +213,17 @@ Krystal Quorum is safety-biased rather than majority-rule voting. A single
 `BLOCK` verdict blocks the merged result, and a single unresolved blocking issue
 forces at least `REVISE`. When two or more reviewers report substantially
 similar blocking issues, Quorum promotes that finding to a shared blocker.
+
+Consensus matching is deterministic and explainable. Quorum groups reviewer
+findings with a small public concept matcher for common review areas such as
+acceptance criteria, rollback, tests, security, dependencies, and observability.
+It does not use embeddings or hidden model calls to decide whether two issues
+match. Persisted review artifacts include `issue_clusters` with members, direct
+match edges, and match reasons.
+
+Set `KRYSTAL_QUORUM_CONSENSUS_MATCHER=legacy` to temporarily restore the older
+token-overlap grouping behavior. The rollback path keeps schema `1.2` and
+leaves `issue_clusters` empty.
 
 Reviewers are asked to emit `per_clause` statuses for common plan clauses such
 as acceptance criteria, rollback, tests, and safety assumptions. Contradictory

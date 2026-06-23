@@ -172,7 +172,7 @@ def test_review_command_outputs_diversity_and_schema_version(tmp_path):
     result = CliRunner().invoke(app, ["review", str(plan), "--reviewers", "mock"])
 
     assert result.exit_code == 0
-    assert '"schema_version": "1.1"' in result.output
+    assert '"schema_version": "1.2"' in result.output
     assert '"diversity": "ok"' in result.output
 
 

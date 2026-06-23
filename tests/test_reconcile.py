@@ -66,6 +66,72 @@ def test_reconcile_groups_paraphrased_shared_issues():
     assert result.singleton_blocking_issues == []
 
 
+def test_reconcile_promotes_rollback_backout_consensus():
+    issue_a = ReviewIssue(
+        id="B1",
+        section="Plan",
+        claim="No rollback plan is described.",
+        evidence="",
+    )
+    issue_b = ReviewIssue(
+        id="B2",
+        section="Plan",
+        claim="Missing backout path if deployment fails.",
+        evidence="",
+    )
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["agy", "claude"],
+        round1_outputs=[
+            output("agy", Verdict.REVISE, issue_a),
+            output("claude", Verdict.REVISE, issue_b),
+        ],
+        round2_outputs=[],
+    )
+
+    assert result.schema_version == "1.2"
+    assert result.merged_verdict == Verdict.BLOCK
+    assert len(result.shared_blocking_issues) == 1
+    assert result.singleton_blocking_issues == []
+    assert result.issue_clusters[0].edges[0].match_reason == (
+        "shared topic rollback with absence intent; gap overlap: recovery"
+    )
+
+
+def test_reconcile_legacy_matcher_env_rolls_back_consensus(monkeypatch):
+    monkeypatch.setenv("KRYSTAL_QUORUM_CONSENSUS_MATCHER", "legacy")
+    issue_a = ReviewIssue(
+        id="B1",
+        section="Plan",
+        claim="No rollback plan is described.",
+        evidence="",
+    )
+    issue_b = ReviewIssue(
+        id="B2",
+        section="Plan",
+        claim="Missing backout path if deployment fails.",
+        evidence="",
+    )
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["agy", "claude"],
+        round1_outputs=[
+            output("agy", Verdict.REVISE, issue_a),
+            output("claude", Verdict.REVISE, issue_b),
+        ],
+        round2_outputs=[],
+    )
+
+    assert result.schema_version == "1.2"
+    assert result.shared_blocking_issues == []
+    assert len(result.singleton_blocking_issues) == 2
+    assert result.issue_clusters == []
+
+
 def test_reconcile_revises_singleton_blocker():
     issue = ReviewIssue(id="B1", section="Acceptance", claim="Missing rollback", evidence="none")
 
@@ -147,4 +213,4 @@ def test_reconcile_includes_schema_version():
         round2_outputs=[],
     )
 
-    assert result.schema_version == "1.1"
+    assert result.schema_version == "1.2"

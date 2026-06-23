@@ -57,6 +57,31 @@ class ContradictionFinding(StrictModel):
     severity: Literal["high", "medium", "low"]
 
 
+class IssueClusterMember(StrictModel):
+    reviewer: str
+    issue_id: str
+    section: str
+    claim: str
+
+
+class IssueClusterEdge(StrictModel):
+    left_reviewer: str
+    left_issue_id: str
+    right_reviewer: str
+    right_issue_id: str
+    match_reason: str
+
+
+class IssueCluster(StrictModel):
+    topic: str
+    shared: bool
+    reviewers: list[str]
+    representative: ReviewIssue
+    members: list[IssueClusterMember]
+    edges: list[IssueClusterEdge] = Field(default_factory=list)
+    match_reason: str
+
+
 class ReviewerFamily(StrictModel):
     reviewer: str
     backend: str
@@ -89,6 +114,7 @@ class ReconciledVerdict(StrictModel):
     confidence: float
     shared_blocking_issues: list[ReviewIssue]
     singleton_blocking_issues: list[ReviewIssue]
+    issue_clusters: list[IssueCluster] = Field(default_factory=list)
     contradictions: list[ContradictionFinding]
     unresolved_for_human: list[str]
     round1_outputs: list[ReviewerOutput]

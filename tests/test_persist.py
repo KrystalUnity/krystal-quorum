@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from krystal_quorum.models import ClauseStatus, ReviewerOutput, Verdict
+from krystal_quorum.models import ClauseStatus, ReviewerOutput, ReviewIssue, Verdict
 from krystal_quorum.persist import persist_run, plan_sha256
 from krystal_quorum.reconcile import reconcile
 
@@ -60,3 +60,60 @@ def test_persist_run_sanitizes_reviewer_filenames(tmp_path: Path):
     assert "\\" not in round1_files[0].name
     assert ":" not in round1_files[0].name
     assert json.loads(round1_files[0].read_text(encoding="utf-8"))["reviewer"] == reviewer_id
+
+
+def test_persist_run_writes_issue_cluster_edges_to_json_and_summary(tmp_path: Path):
+    plan_text = "## Rollback\n- Missing"
+    issue_a = ReviewIssue(
+        id="B1",
+        section="Plan",
+        claim="No rollback plan is described.",
+        evidence="",
+    )
+    issue_b = ReviewIssue(
+        id="B2",
+        section="Plan",
+        claim="Missing backout path if deployment fails.",
+        evidence="",
+    )
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text=plan_text,
+        reviewers_used=["agy", "claude"],
+        round1_outputs=[
+            ReviewerOutput(
+                reviewer="agy",
+                round=1,
+                verdict=Verdict.REVISE,
+                confidence=0.8,
+                blocking_issues=[issue_a],
+                suggestions=[],
+                per_clause={"rollback.plan": ClauseStatus.UNSATISFIED},
+                raw_response="{}",
+                elapsed_seconds=0.1,
+            ),
+            ReviewerOutput(
+                reviewer="claude",
+                round=1,
+                verdict=Verdict.REVISE,
+                confidence=0.8,
+                blocking_issues=[issue_b],
+                suggestions=[],
+                per_clause={"rollback.plan": ClauseStatus.UNSATISFIED},
+                raw_response="{}",
+                elapsed_seconds=0.1,
+            ),
+        ],
+        round2_outputs=[],
+    )
+
+    run_dir = persist_run(tmp_path, Path("plan.md"), plan_text, result)
+    reconciled = json.loads((run_dir / "reconciled.json").read_text(encoding="utf-8"))
+    summary = (run_dir / "summary.md").read_text(encoding="utf-8")
+
+    assert reconciled["schema_version"] == "1.2"
+    assert reconciled["issue_clusters"][0]["edges"][0]["match_reason"] == (
+        "shared topic rollback with absence intent; gap overlap: recovery"
+    )
+    assert "## Issue Clusters" in summary
+    assert "gap overlap: recovery" in summary

@@ -3,22 +3,23 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timezone
 from statistics import mean
-import re
+import os
 
+from krystal_quorum.diversity import analyze_reviewer_diversity
+from krystal_quorum.issue_matching import cluster_issues, legacy_group_issues
 from krystal_quorum.models import (
     ClauseStatus,
     ContradictionFinding,
     DiversityReport,
+    IssueCluster,
     ReconciledVerdict,
-    ReviewIssue,
     Round2Comparison,
     ReviewerOutput,
     Verdict,
 )
-from krystal_quorum.diversity import analyze_reviewer_diversity
 from krystal_quorum.persist import plan_sha256
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 COMPARABLE_ROUND2_VERDICTS = {Verdict.APPROVE, Verdict.REVISE, Verdict.BLOCK}
 
 
@@ -26,79 +27,6 @@ def _effective_outputs(
     round1_outputs: list[ReviewerOutput], round2_outputs: list[ReviewerOutput]
 ) -> list[ReviewerOutput]:
     return round2_outputs or round1_outputs
-
-
-def _fingerprint(issue: ReviewIssue) -> str:
-    return " ".join(issue.claim.lower().split())[:80]
-
-
-STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "as",
-    "be",
-    "but",
-    "by",
-    "for",
-    "from",
-    "has",
-    "have",
-    "in",
-    "is",
-    "it",
-    "lacks",
-    "missing",
-    "no",
-    "not",
-    "of",
-    "on",
-    "or",
-    "plan",
-    "the",
-    "to",
-    "with",
-}
-
-
-def _issue_tokens(issue: ReviewIssue) -> set[str]:
-    text = f"{issue.section} {issue.claim}".lower()
-    tokens = set(re.findall(r"[a-z0-9]+", text))
-    return {token for token in tokens if len(token) > 2 and token not in STOPWORDS}
-
-
-def _issues_match(left: ReviewIssue, right: ReviewIssue) -> bool:
-    if _fingerprint(left) == _fingerprint(right):
-        return True
-    left_tokens = _issue_tokens(left)
-    right_tokens = _issue_tokens(right)
-    if not left_tokens or not right_tokens:
-        return False
-    overlap = len(left_tokens & right_tokens)
-    smaller = min(len(left_tokens), len(right_tokens))
-    return overlap >= 3 and overlap / smaller >= 0.5
-
-
-def _group_issues(outputs: list[ReviewerOutput]) -> tuple[list[ReviewIssue], list[ReviewIssue]]:
-    grouped: list[tuple[ReviewIssue, set[str]]] = []
-    for output in outputs:
-        for issue in output.blocking_issues:
-            for grouped_issue, reviewers in grouped:
-                if _issues_match(grouped_issue, issue):
-                    reviewers.add(output.reviewer)
-                    break
-            else:
-                grouped.append((issue, {output.reviewer}))
-
-    shared: list[ReviewIssue] = []
-    singletons: list[ReviewIssue] = []
-    for issue, reviewers in grouped:
-        if len(reviewers) >= 2:
-            shared.append(issue)
-        else:
-            singletons.append(issue)
-    return shared, singletons
 
 
 def _find_contradictions(outputs: list[ReviewerOutput]) -> list[ContradictionFinding]:
@@ -169,7 +97,18 @@ def reconcile(
     non_abstained = [output for output in outputs if output.verdict != Verdict.ABSTAIN]
     abstained = [output.reviewer for output in outputs if output.verdict == Verdict.ABSTAIN]
 
-    shared, singletons = _group_issues(non_abstained)
+    issue_items = [
+        (output.reviewer, issue)
+        for output in non_abstained
+        for issue in output.blocking_issues
+    ]
+    if os.getenv("KRYSTAL_QUORUM_CONSENSUS_MATCHER", "deterministic").lower() == "legacy":
+        shared, singletons = legacy_group_issues(issue_items)
+        issue_clusters: list[IssueCluster] = []
+    else:
+        issue_clusters = cluster_issues(issue_items)
+        shared = [cluster.representative for cluster in issue_clusters if cluster.shared]
+        singletons = [cluster.representative for cluster in issue_clusters if not cluster.shared]
     contradictions = _find_contradictions(non_abstained)
     round2_delta, round2_comparisons = _round2_report(
         reviewers_used,
@@ -208,6 +147,7 @@ def reconcile(
         confidence=confidence,
         shared_blocking_issues=shared,
         singleton_blocking_issues=singletons,
+        issue_clusters=issue_clusters,
         contradictions=contradictions,
         unresolved_for_human=unresolved,
         round1_outputs=round1_outputs,
