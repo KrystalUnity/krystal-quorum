@@ -53,6 +53,17 @@ def test_plan_section_token_does_not_create_support_overlap_consensus():
     assert shared(clusters) == []
 
 
+def test_single_shared_support_term_does_not_create_consensus():
+    clusters = cluster_issues(
+        [
+            ("agy", issue("B1", "Security admin missing.")),
+            ("claude", issue("B2", "Security admin unclear.")),
+        ]
+    )
+
+    assert shared(clusters) == []
+
+
 def test_connected_component_joins_by_non_representative_match():
     clusters = cluster_issues(
         [

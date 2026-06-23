@@ -221,9 +221,15 @@ It does not use embeddings or hidden model calls to decide whether two issues
 match. Persisted review artifacts include `issue_clusters` with members, direct
 match edges, and match reasons.
 
+Support-overlap consensus requires at least two shared support terms and an
+overlap coefficient of at least `0.50`. Absence-style findings require a shared
+topic-specific gap term, so broad words like "missing" or generic section names
+like "Plan" are not enough to create consensus.
+
 Set `KRYSTAL_QUORUM_CONSENSUS_MATCHER=legacy` to temporarily restore the older
-token-overlap grouping behavior. The rollback path keeps schema `1.2` and
-leaves `issue_clusters` empty.
+token-overlap grouping behavior. This is a behavior rollback, not a schema
+downgrade: schema-1.1-only consumers should pin a v0.3.x release or revert the
+v0.4 change.
 
 Reviewers are asked to emit `per_clause` statuses for common plan clauses such
 as acceptance criteria, rollback, tests, and safety assumptions. Contradictory
