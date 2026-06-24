@@ -216,3 +216,52 @@ def test_review_command_outputs_diversity_reason_and_round2_comparisons(tmp_path
             "changed": False,
         },
     ]
+
+
+def test_review_command_outputs_abstentions_and_human_triage(tmp_path, monkeypatch):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Acceptance\n- Works", encoding="utf-8")
+
+    class AbstainingReviewer:
+        def __init__(self, reviewer_id: str, verdict: Verdict) -> None:
+            self.id = reviewer_id
+            self.verdict = verdict
+
+        async def review_round1(self, plan_text: str, *, timeout_s: int) -> ReviewerOutput:
+            del plan_text, timeout_s
+            return ReviewerOutput(
+                reviewer=self.id,
+                round=1,
+                verdict=self.verdict,
+                confidence=0.8 if self.verdict != Verdict.ABSTAIN else 0.0,
+                blocking_issues=[],
+                suggestions=[],
+                per_clause={},
+                raw_response="{}",
+                elapsed_seconds=0.1,
+            )
+
+        async def review_round2(
+            self, plan_text: str, round1_outputs: list[ReviewerOutput], *, timeout_s: int
+        ) -> ReviewerOutput:
+            del round1_outputs
+            return await self.review_round1(plan_text, timeout_s=timeout_s)
+
+    monkeypatch.setattr(
+        "krystal_quorum.cli.build_reviewers",
+        lambda reviewers, config_path=None: [
+            AbstainingReviewer("a", Verdict.APPROVE),
+            AbstainingReviewer("b", Verdict.ABSTAIN),
+            AbstainingReviewer("c", Verdict.ABSTAIN),
+        ],
+    )
+
+    result = CliRunner().invoke(app, ["review", str(plan), "--reviewers", "a,b,c"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["verdict"] == "REVISE"
+    assert payload["abstained_reviewers"] == ["b", "c"]
+    assert payload["unresolved_for_human"] == [
+        "Quorum collapsed: only 1 of 3 reviewers produced usable output."
+    ]

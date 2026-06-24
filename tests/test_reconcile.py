@@ -1,4 +1,4 @@
-from krystal_quorum.models import ClauseStatus, ReviewIssue, ReviewerOutput, Verdict
+from krystal_quorum.models import ClauseStatus, DiversityReport, ReviewIssue, ReviewerFamily, ReviewerOutput, Verdict
 from krystal_quorum.reconcile import reconcile
 
 
@@ -147,21 +147,66 @@ def test_reconcile_revises_singleton_blocker():
     assert result.singleton_blocking_issues == [issue]
 
 
-def test_reconcile_ignores_abstained_reviewer_confidence():
+def test_reconcile_flags_collapsed_multi_reviewer_quorum():
     result = reconcile(
         plan_path="plan.md",
         plan_text="plan",
-        reviewers_used=["a", "b"],
+        reviewers_used=["a", "b", "c"],
         round1_outputs=[
             output("a", Verdict.APPROVE),
             output("b", Verdict.ABSTAIN),
+            output("c", Verdict.ABSTAIN),
+        ],
+        round2_outputs=[],
+    )
+
+    assert result.merged_verdict == Verdict.REVISE
+    assert result.confidence < 0.3
+    assert result.abstained_reviewers == ["b", "c"]
+    assert result.unresolved_for_human == [
+        "Quorum collapsed: only 1 of 3 reviewers produced usable output."
+    ]
+
+
+def test_reconcile_flags_partial_multi_reviewer_abstentions():
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b", "c"],
+        round1_outputs=[
+            output("a", Verdict.APPROVE),
+            output("b", Verdict.APPROVE),
+            output("c", Verdict.ABSTAIN),
         ],
         round2_outputs=[],
     )
 
     assert result.merged_verdict == Verdict.APPROVE
-    assert result.confidence == 0.8
-    assert result.abstained_reviewers == ["b"]
+    assert result.confidence < 0.8
+    assert "Partial quorum: 1 of 3 reviewers abstained." in result.unresolved_for_human
+
+
+def test_reconcile_penalizes_low_diversity_confidence():
+    diversity = DiversityReport(
+        status="low",
+        reviewers=[
+            ReviewerFamily(reviewer="a", backend="openai", family="gpt-4"),
+            ReviewerFamily(reviewer="b", backend="openai", family="gpt-4"),
+        ],
+        reason="reviewers share model family gpt-4",
+    )
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b"],
+        round1_outputs=[output("a", Verdict.APPROVE), output("b", Verdict.APPROVE)],
+        round2_outputs=[],
+        diversity=diversity,
+    )
+
+    assert result.merged_verdict == Verdict.APPROVE
+    assert result.confidence == 0.6
 
 
 def test_reconcile_keeps_single_block_fail_safe_with_majority_approve():
@@ -178,6 +223,41 @@ def test_reconcile_keeps_single_block_fail_safe_with_majority_approve():
     )
 
     assert result.merged_verdict == Verdict.BLOCK
+
+
+def test_reconcile_normalizes_per_clause_keys_for_contradictions():
+    left = output("a", Verdict.APPROVE)
+    left.per_clause = {"Acceptance.Criteria": ClauseStatus.SATISFIED}
+    right = output("b", Verdict.REVISE)
+    right.per_clause = {"acceptance_criteria": ClauseStatus.UNSATISFIED}
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b"],
+        round1_outputs=[left, right],
+        round2_outputs=[],
+    )
+
+    assert result.merged_verdict == Verdict.REVISE
+    assert result.contradictions[0].clause_id == "acceptance.criteria"
+    assert result.contradictions[0].severity == "high"
+
+
+def test_reconcile_flags_unknown_per_clause_keys():
+    left = output("a", Verdict.APPROVE)
+    left.per_clause = {"deployment.window": ClauseStatus.SATISFIED}
+    right = output("b", Verdict.APPROVE)
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b"],
+        round1_outputs=[left, right],
+        round2_outputs=[],
+    )
+
+    assert "Unknown per_clause key from a ignored: deployment.window" in result.unresolved_for_human
 
 
 def test_reconcile_reports_round2_delta_for_comparable_verdict_changes():

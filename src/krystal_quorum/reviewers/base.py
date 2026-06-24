@@ -19,6 +19,8 @@ SUGGESTION_ALIASES = {
 }
 TOP_LEVEL_FIELDS = {"verdict", "confidence", "blocking_issues", "suggestions", "per_clause"}
 PARSE_RETRIES = 1
+TRANSPORT_RETRIES = 2
+TRANSPORT_RETRY_BACKOFF_S = 0.05
 PARSE_RETRY_INSTRUCTION = (
     "\n\nYour previous response could not be parsed as the required strict JSON. "
     "Retry once and return only the required <json>...</json> object."

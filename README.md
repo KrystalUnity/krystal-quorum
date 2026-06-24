@@ -90,6 +90,8 @@ one human-triage summary.
 If a reviewer returns malformed text instead of the strict JSON contract,
 Krystal Quorum retries that reviewer once with a JSON-only reminder. The final
 artifact records the retry count and preserves raw text from both attempts.
+Transient HTTP failures from Ollama or OpenAI-compatible reviewers are retried
+before the reviewer is marked `ABSTAIN`.
 
 Use the mock reviewer first to prove the workflow works. It uses no network and
 requires no keys:
@@ -189,6 +191,9 @@ Command reviewers are intentionally generic. They can wrap installed CLIs,
 local scripts, or remote shells. If a command times out, exits without output,
 or still returns unparseable text after the one-shot parse retry, Krystal
 Quorum records that reviewer as `ABSTAIN` instead of blocking the whole run.
+Multi-reviewer runs surface partial abstentions in `unresolved_for_human`; if a
+multi-reviewer quorum collapses to only one usable reviewer, the merged verdict
+is forced to `REVISE` for human triage.
 
 Try the bundled command-reviewer example:
 
@@ -242,6 +247,9 @@ command = ["bash", "reviewers/a.sh"]
 family = "local-agent"
 ```
 
+Low diversity does not change the verdict by itself, but it reduces the
+reported system confidence.
+
 ## Reconciliation Model
 
 Krystal Quorum is safety-biased rather than majority-rule voting. A single
@@ -269,6 +277,12 @@ v0.4 change.
 Reviewers are asked to emit `per_clause` statuses for common plan clauses such
 as acceptance criteria, rollback, tests, and safety assumptions. Contradictory
 clause statuses are surfaced for human triage instead of being averaged away.
+Common key variants such as `acceptance_criteria` are normalized before
+comparison; unknown keys are flagged in `unresolved_for_human`.
+
+The `confidence` field is a system-adjusted signal. It starts from reviewer
+self-reported confidence, then discounts weak quorum health, low diversity,
+singleton blockers, and contradictions.
 
 Architecture notes:
 

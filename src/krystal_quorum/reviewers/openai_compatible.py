@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -9,6 +10,8 @@ from krystal_quorum.models import ReviewerOutput
 from krystal_quorum.prompts import round1_prompt, round2_prompt
 from krystal_quorum.reviewers.base import (
     PARSE_RETRIES,
+    TRANSPORT_RETRIES,
+    TRANSPORT_RETRY_BACKOFF_S,
     combined_raw_attempts,
     elapsed_since,
     fallback_output,
@@ -45,48 +48,69 @@ class OpenAICompatibleReviewer:
     async def _review(self, prompt: str, round_number: int, timeout_s: int) -> ReviewerOutput:
         start = time.monotonic()
         raw_attempts: list[str] = []
-        for retries in range(PARSE_RETRIES + 1):
-            attempt_prompt = prompt if retries == 0 else retry_prompt(prompt)
-            try:
-                async with httpx.AsyncClient(transport=self.transport, timeout=timeout_s) as client:
-                    response = await client.post(
-                        f"{self.base_url}/chat/completions",
-                        headers={"Authorization": f"Bearer {self.api_key}"},
-                        json={
-                            "model": self.model,
-                            "stream": False,
-                            "messages": [{"role": "user", "content": attempt_prompt}],
-                        },
+        transport_retries = 0
+        for parse_retries in range(PARSE_RETRIES + 1):
+            attempt_prompt = prompt if parse_retries == 0 else retry_prompt(prompt)
+            raw: str | None = None
+            for request_retries in range(TRANSPORT_RETRIES + 1):
+                try:
+                    async with httpx.AsyncClient(
+                        transport=self.transport, timeout=timeout_s
+                    ) as client:
+                        response = await client.post(
+                            f"{self.base_url}/chat/completions",
+                            headers={"Authorization": f"Bearer {self.api_key}"},
+                            json={
+                                "model": self.model,
+                                "stream": False,
+                                "messages": [{"role": "user", "content": attempt_prompt}],
+                            },
+                        )
+                        response.raise_for_status()
+                        raw = self._extract_text(response.json())
+                    break
+                except httpx.HTTPError as exc:
+                    if request_retries >= TRANSPORT_RETRIES:
+                        return fallback_output(
+                            self.id,
+                            round_number,
+                            claim=f"reviewer request failed: {type(exc).__name__}",
+                            evidence=str(exc),
+                            elapsed_seconds=elapsed_since(start),
+                            retries=transport_retries + parse_retries,
+                        )
+                    transport_retries += 1
+                    await asyncio.sleep(TRANSPORT_RETRY_BACKOFF_S * (2**request_retries))
+                except Exception as exc:
+                    return fallback_output(
+                        self.id,
+                        round_number,
+                        claim=f"reviewer request failed: {type(exc).__name__}",
+                        evidence=str(exc),
+                        elapsed_seconds=elapsed_since(start),
+                        retries=transport_retries + parse_retries,
                     )
-                    response.raise_for_status()
-                    raw = self._extract_text(response.json())
-            except Exception as exc:
-                return fallback_output(
-                    self.id,
-                    round_number,
-                    claim=f"reviewer request failed: {type(exc).__name__}",
-                    evidence=str(exc),
-                    elapsed_seconds=elapsed_since(start),
-                    retries=retries,
-                )
+            if raw is None:
+                continue
             raw_attempts.append(raw)
+            total_retries = transport_retries + parse_retries
             output = parse_reviewer_output(
                 self.id,
                 round_number,
                 raw,
                 elapsed_seconds=elapsed_since(start),
-                retries=retries,
+                retries=total_retries,
             )
             if len(raw_attempts) > 1:
                 output.raw_response = combined_raw_attempts(raw_attempts)
-            if not is_parse_failure(output) or retries >= PARSE_RETRIES:
+            if not is_parse_failure(output) or parse_retries >= PARSE_RETRIES:
                 return output
         return fallback_output(
             self.id,
             round_number,
             claim="reviewer retry loop exhausted",
             elapsed_seconds=elapsed_since(start),
-            retries=PARSE_RETRIES,
+            retries=transport_retries + PARSE_RETRIES,
         )
 
     def _extract_text(self, payload: dict[str, Any]) -> str:

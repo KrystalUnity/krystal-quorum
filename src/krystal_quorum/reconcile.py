@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from statistics import mean
 import os
+import re
 
 from krystal_quorum.diversity import analyze_reviewer_diversity
 from krystal_quorum.issue_matching import cluster_issues, legacy_group_issues
@@ -21,6 +22,17 @@ from krystal_quorum.persist import plan_sha256
 
 SCHEMA_VERSION = "1.2"
 COMPARABLE_ROUND2_VERDICTS = {Verdict.APPROVE, Verdict.REVISE, Verdict.BLOCK}
+CLAUSE_KEY_ALIASES = {
+    "acceptance.criteria": "acceptance.criteria",
+    "acceptance": "acceptance.criteria",
+    "rollback.plan": "rollback.plan",
+    "rollback": "rollback.plan",
+    "tests.verification": "tests.verification",
+    "test.verification": "tests.verification",
+    "verification": "tests.verification",
+    "safety.assumptions": "safety.assumptions",
+    "safety": "safety.assumptions",
+}
 
 
 def _effective_outputs(
@@ -29,10 +41,38 @@ def _effective_outputs(
     return round2_outputs or round1_outputs
 
 
-def _find_contradictions(outputs: list[ReviewerOutput]) -> list[ContradictionFinding]:
+def _canonical_clause_key(clause: str) -> str | None:
+    normalized = re.sub(r"[\s_-]+", ".", clause.strip().lower())
+    normalized = re.sub(r"\.+", ".", normalized).strip(".")
+    if re.fullmatch(r"acceptance\.\d+", normalized):
+        return "acceptance.criteria"
+    return CLAUSE_KEY_ALIASES.get(normalized)
+
+
+def _normalized_per_clause(output: ReviewerOutput) -> tuple[dict[str, ClauseStatus], list[str]]:
+    normalized: dict[str, ClauseStatus] = {}
+    unknown: list[str] = []
+    for clause, status in output.per_clause.items():
+        canonical = _canonical_clause_key(clause)
+        if canonical is None:
+            unknown.append(clause)
+            continue
+        normalized[canonical] = status
+    return normalized, unknown
+
+
+def _find_contradictions(
+    outputs: list[ReviewerOutput],
+) -> tuple[list[ContradictionFinding], list[str]]:
     positions_by_clause: dict[str, dict[str, ClauseStatus]] = defaultdict(dict)
+    unknown_clause_warnings: list[str] = []
     for output in outputs:
-        for clause, status in output.per_clause.items():
+        normalized, unknown = _normalized_per_clause(output)
+        for clause in unknown:
+            unknown_clause_warnings.append(
+                f"Unknown per_clause key from {output.reviewer} ignored: {clause}"
+            )
+        for clause, status in normalized.items():
             if status != ClauseStatus.NA:
                 positions_by_clause[clause][output.reviewer] = status
 
@@ -53,7 +93,7 @@ def _find_contradictions(outputs: list[ReviewerOutput]) -> list[ContradictionFin
                 severity=severity,
             )
         )
-    return contradictions
+    return contradictions, unknown_clause_warnings
 
 
 def _round2_report(
@@ -84,6 +124,34 @@ def _round2_report(
     return sum(1 for comparison in comparisons if comparison.changed is True), comparisons
 
 
+def _system_confidence(
+    *,
+    outputs: list[ReviewerOutput],
+    non_abstained: list[ReviewerOutput],
+    diversity: DiversityReport,
+    singletons: list[object],
+    contradictions: list[ContradictionFinding],
+    collapsed_quorum: bool,
+) -> float:
+    if not non_abstained:
+        return 0.0
+
+    self_reported = mean(output.confidence for output in non_abstained)
+    usable_ratio = len(non_abstained) / max(1, len(outputs))
+    confidence = self_reported * usable_ratio
+
+    if diversity.status == "low":
+        confidence *= 0.75
+    if contradictions:
+        confidence *= 0.6
+    elif singletons:
+        confidence *= 0.85
+    if collapsed_quorum:
+        confidence = min(confidence, 0.25)
+
+    return round(confidence, 3)
+
+
 def reconcile(
     *,
     plan_path: str,
@@ -96,6 +164,9 @@ def reconcile(
     outputs = _effective_outputs(round1_outputs, round2_outputs)
     non_abstained = [output for output in outputs if output.verdict != Verdict.ABSTAIN]
     abstained = [output.reviewer for output in outputs if output.verdict == Verdict.ABSTAIN]
+    diversity = diversity or analyze_reviewer_diversity(reviewers_used)
+    collapsed_quorum = len(outputs) > 1 and 0 < len(non_abstained) < 2
+    partial_quorum = len(outputs) > 1 and bool(abstained) and not collapsed_quorum
 
     issue_items = [
         (output.reviewer, issue)
@@ -109,7 +180,7 @@ def reconcile(
         issue_clusters = cluster_issues(issue_items)
         shared = [cluster.representative for cluster in issue_clusters if cluster.shared]
         singletons = [cluster.representative for cluster in issue_clusters if not cluster.shared]
-    contradictions = _find_contradictions(non_abstained)
+    contradictions, unknown_clause_warnings = _find_contradictions(non_abstained)
     round2_delta, round2_comparisons = _round2_report(
         reviewers_used,
         round1_outputs,
@@ -118,6 +189,8 @@ def reconcile(
 
     verdicts = [output.verdict for output in non_abstained]
     if not non_abstained:
+        merged = Verdict.REVISE
+    elif collapsed_quorum:
         merged = Verdict.REVISE
     elif shared or Verdict.BLOCK in verdicts:
         merged = Verdict.BLOCK
@@ -129,19 +202,34 @@ def reconcile(
     unresolved: list[str] = []
     if not non_abstained:
         unresolved.append("All reviewers abstained; no usable review signal was produced.")
+    elif collapsed_quorum:
+        unresolved.append(
+            f"Quorum collapsed: only {len(non_abstained)} of {len(outputs)} reviewers "
+            "produced usable output."
+        )
+    elif partial_quorum:
+        unresolved.append(f"Partial quorum: {len(abstained)} of {len(outputs)} reviewers abstained.")
     for issue in singletons:
         unresolved.append(f"Singleton blocker: {issue.claim}")
     for contradiction in contradictions:
         unresolved.append(f"Contradiction on {contradiction.clause_id}: human triage required.")
+    unresolved.extend(unknown_clause_warnings)
 
-    confidence = mean(output.confidence for output in non_abstained) if non_abstained else 0.0
+    confidence = _system_confidence(
+        outputs=outputs,
+        non_abstained=non_abstained,
+        diversity=diversity,
+        singletons=singletons,
+        contradictions=contradictions,
+        collapsed_quorum=collapsed_quorum,
+    )
     return ReconciledVerdict(
         schema_version=SCHEMA_VERSION,
         plan_path=plan_path,
         plan_sha256=plan_sha256(plan_text),
         timestamp=datetime.now(timezone.utc).isoformat(),
         reviewers_used=reviewers_used,
-        diversity=diversity or analyze_reviewer_diversity(reviewers_used),
+        diversity=diversity,
         abstained_reviewers=abstained,
         merged_verdict=merged,
         confidence=confidence,

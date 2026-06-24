@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from krystal_quorum.models import ReviewerOutput, Verdict
 
 
@@ -65,12 +67,13 @@ def round2_prompt(
         for output in round1_outputs
         if output.verdict != Verdict.ABSTAIN
     ]
+    peer_findings_json = json.dumps(peer_findings, indent=2)
     return f"""You are {reviewer_id}, performing Round 2 cross-audit.
 
 Review peer findings, agree or refute them using the plan text, and return a fresh strict JSON verdict.
 
 PEER FINDINGS:
-{peer_findings}
+{peer_findings_json}
 
 {round1_prompt(reviewer_id, plan_text)}
 """

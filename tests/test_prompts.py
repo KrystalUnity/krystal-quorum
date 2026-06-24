@@ -1,4 +1,7 @@
-from krystal_quorum.prompts import round1_prompt
+import json
+
+from krystal_quorum.models import ReviewerOutput, Verdict
+from krystal_quorum.prompts import round1_prompt, round2_prompt
 
 
 def test_round1_prompt_specifies_issue_suggestion_and_clause_schema():
@@ -14,3 +17,31 @@ def test_round1_prompt_specifies_issue_suggestion_and_clause_schema():
     assert '"tests.verification": "SATISFIED"' in prompt
     assert "Use these exact per_clause keys when judging plan coverage." in prompt
     assert "Only use per_clause values SATISFIED, UNSATISFIED, UNCLEAR, or N/A." in prompt
+
+
+def test_round2_prompt_embeds_peer_findings_as_json():
+    output = ReviewerOutput(
+        reviewer="peer",
+        round=1,
+        verdict=Verdict.REVISE,
+        confidence=0.8,
+        blocking_issues=[],
+        suggestions=[],
+        per_clause={},
+        raw_response="{}",
+        elapsed_seconds=0.1,
+    )
+
+    prompt = round2_prompt("reviewer", "plan text", [output])
+
+    peer_json = prompt.split("PEER FINDINGS:\n", 1)[1].split("\n\nYou are reviewer", 1)[0]
+    parsed = json.loads(peer_json)
+    assert parsed == [
+        {
+            "reviewer": "peer",
+            "verdict": "REVISE",
+            "blocking_issues": [],
+            "suggestions": [],
+        }
+    ]
+    assert "'verdict':" not in peer_json

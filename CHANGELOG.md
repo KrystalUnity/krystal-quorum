@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1 - 2026-06-24
+
+- Forced collapsed multi-reviewer quorums to `REVISE` and surfaced quorum health in CLI JSON and summaries.
+- Added transport retries for transient Ollama and OpenAI-compatible reviewer failures before abstaining.
+- Penalized system confidence for partial quorum, low reviewer diversity, singleton blockers, and contradictions.
+- Normalized known `per_clause` key variants before contradiction detection and flagged unknown keys for human triage.
+- Serialized Round 2 peer findings as JSON instead of Python repr.
+- Added Python 3.12 to CI and documented command-reviewer environment inheritance.
+
 ## 0.5.0 - 2026-06-24
 
 - Added `krystal-quorum init --target claude-code|hermes|openclaw` for project-local agent integration templates.

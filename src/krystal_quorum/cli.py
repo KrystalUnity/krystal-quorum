@@ -119,6 +119,8 @@ def review(
         "diversity_reviewers": [
             reviewer.model_dump(mode="json") for reviewer in result.diversity.reviewers
         ],
+        "abstained_reviewers": result.abstained_reviewers,
+        "unresolved_for_human": result.unresolved_for_human,
         "output_dir": str(run_dir),
     }
     if result.round2_delta is not None:

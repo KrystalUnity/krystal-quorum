@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.5.0"
+    assert pyproject["project"]["version"] == "0.5.1"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
@@ -86,6 +86,19 @@ def test_github_action_exposes_expected_inputs() -> None:
         'krystal-quorum "${args[@]}"',
     ]:
         assert expected in action_text
+
+
+def test_ci_tests_supported_python_versions() -> None:
+    ci_text = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    assert 'python-version: ["3.11", "3.12"]' in ci_text
+
+
+def test_security_doc_warns_command_reviewers_inherit_environment() -> None:
+    security_text = (REPO_ROOT / "SECURITY.md").read_text(encoding="utf-8")
+
+    assert "Command reviewers inherit the parent process environment" in security_text
+    assert "allowlisted environment" in security_text
 
 
 def test_demo_examples_have_deterministic_mock_verdicts() -> None:

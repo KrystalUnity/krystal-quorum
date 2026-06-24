@@ -27,6 +27,19 @@ class SequentialTransport(httpx.AsyncBaseTransport):
         return httpx.Response(200, json=payload, request=request)
 
 
+class SequentialResponseTransport(httpx.AsyncBaseTransport):
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.requests = []
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
 @pytest.mark.asyncio
 async def test_ollama_posts_to_api_chat_and_reads_content():
     transport = CaptureTransport(
@@ -136,7 +149,62 @@ async def test_openai_compatible_retries_once_when_response_is_malformed():
 
 
 @pytest.mark.asyncio
-async def test_adapter_failure_abstains():
+async def test_ollama_retries_transient_transport_errors_before_abstaining():
+    transport = SequentialResponseTransport(
+        [
+            httpx.ConnectError("temporary down"),
+            httpx.ConnectError("still down"),
+            httpx.Response(503, request=httpx.Request("POST", "http://localhost/api/chat")),
+        ]
+    )
+    reviewer = OllamaReviewer(
+        reviewer_id="local",
+        model="qwen2.5:14b",
+        base_url="http://localhost:11434",
+        transport=transport,
+    )
+
+    output = await reviewer.review_round1("plan", timeout_s=1)
+
+    assert output.verdict == Verdict.ABSTAIN
+    assert output.retries == 2
+    assert len(transport.requests) == 3
+
+
+@pytest.mark.asyncio
+async def test_openai_compatible_retries_transient_http_errors_then_succeeds():
+    success = {
+        "choices": [
+            {
+                "message": {
+                    "content": '<json>{"verdict":"APPROVE","confidence":0.9,"blocking_issues":[],"suggestions":[],"per_clause":{}}</json>'
+                }
+            }
+        ]
+    }
+    transport = SequentialResponseTransport(
+        [
+            httpx.Response(503, request=httpx.Request("POST", "https://example.test/v1/chat/completions")),
+            httpx.Response(200, json=success, request=httpx.Request("POST", "https://example.test/v1/chat/completions")),
+        ]
+    )
+    reviewer = OpenAICompatibleReviewer(
+        reviewer_id="api",
+        model="gpt-test",
+        base_url="https://example.test/v1",
+        api_key="test",
+        transport=transport,
+    )
+
+    output = await reviewer.review_round1("plan", timeout_s=1)
+
+    assert output.verdict == Verdict.APPROVE
+    assert output.retries == 1
+    assert len(transport.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_adapter_failure_abstains_after_transport_retries():
     async def boom(_request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("down")
 
@@ -150,3 +218,4 @@ async def test_adapter_failure_abstains():
     output = await reviewer.review_round1("plan", timeout_s=1)
 
     assert output.verdict == Verdict.ABSTAIN
+    assert output.retries == 2
