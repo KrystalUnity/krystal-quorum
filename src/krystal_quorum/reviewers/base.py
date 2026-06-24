@@ -105,17 +105,35 @@ def _load_json_object(candidate: str) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
+def _complete_reviewer_payload(payload: dict[str, Any]) -> bool:
+    return TOP_LEVEL_FIELDS.issubset(payload.keys())
+
+
+def _extract_preferred_payload(candidate: str) -> dict[str, Any] | None:
+    payloads: list[dict[str, Any]] = []
+    parsed = _load_json_object(candidate)
+    if parsed is not None:
+        payloads.append(parsed)
+    for balanced in _json_object_candidates(candidate):
+        parsed = _load_json_object(balanced)
+        if parsed is not None:
+            payloads.append(parsed)
+
+    complete = [payload for payload in payloads if _complete_reviewer_payload(payload)]
+    if complete:
+        return complete[-1]
+    if payloads:
+        return payloads[-1]
+    return None
+
+
 def extract_json(raw: str) -> dict[str, Any] | None:
     match = re.search(r"<json>\s*(.*?)\s*</json>", raw, flags=re.DOTALL | re.IGNORECASE)
     direct_candidates = [match.group(1)] if match else [raw]
     for candidate in direct_candidates:
-        parsed = _load_json_object(candidate)
+        parsed = _extract_preferred_payload(candidate)
         if parsed is not None:
             return parsed
-        for balanced in _json_object_candidates(candidate):
-            parsed = _load_json_object(balanced)
-            if parsed is not None:
-                return parsed
     return None
 
 

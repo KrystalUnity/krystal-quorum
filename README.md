@@ -28,6 +28,11 @@ If you are already in a checkout, only the install and review commands are
 needed. The command writes an append-only review run under
 `.krystal-quorum/reviews/`.
 
+By default Quorum rejects plans over 120,000 characters before reviewers are
+constructed, with a rough token estimate in the error. Use `--max-plan-chars`
+to raise the limit or `--max-plan-chars 0` to disable the guard for a
+controlled run.
+
 For development from a checkout:
 
 ```bash
@@ -92,6 +97,10 @@ Krystal Quorum retries that reviewer once with a JSON-only reminder. The final
 artifact records the retry count and preserves raw text from both attempts.
 Transient HTTP failures from Ollama or OpenAI-compatible reviewers are retried
 before the reviewer is marked `ABSTAIN`.
+When a reviewer omits `<json>` tags, Quorum searches for complete reviewer JSON
+objects and prefers the last one, which reduces false parses when a model echoes
+the schema before its final answer. Reasoning-only responses are parsed only
+when they contain explicit `<json>...</json>` tags.
 
 Use the mock reviewer first to prove the workflow works. It uses no network and
 requires no keys:
@@ -288,6 +297,10 @@ Architecture notes:
 
 - [Consensus matching](docs/architecture/consensus-matching.md)
 - [Local command reviewers](docs/architecture/local-command-reviewers.md)
+
+Benchmark fixtures live in [benchmarks/](benchmarks/). They provide a small,
+public way to compare single-reviewer and multi-reviewer behavior without
+claiming more evidence than the project has collected.
 
 ## Exit Codes
 

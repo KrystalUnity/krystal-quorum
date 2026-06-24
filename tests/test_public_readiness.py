@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tomllib
 
@@ -10,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.5.1"
+    assert pyproject["project"]["version"] == "0.5.2"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
@@ -37,6 +38,11 @@ def test_public_release_files_exist() -> None:
         "docs/assets/quorum-demo.svg",
         "examples/good-plan.md",
         "examples/agent-plan.md",
+        "benchmarks/README.md",
+        "benchmarks/expected-findings.json",
+        "benchmarks/fixtures/missing-acceptance.md",
+        "benchmarks/fixtures/missing-rollback.md",
+        "benchmarks/run_quorum_benchmark.py",
     ]:
         assert (REPO_ROOT / relative_path).exists(), relative_path
 
@@ -99,6 +105,19 @@ def test_security_doc_warns_command_reviewers_inherit_environment() -> None:
 
     assert "Command reviewers inherit the parent process environment" in security_text
     assert "allowlisted environment" in security_text
+
+
+def test_benchmark_expected_findings_reference_existing_fixtures() -> None:
+    expected_path = REPO_ROOT / "benchmarks" / "expected-findings.json"
+    payload = json.loads(expected_path.read_text(encoding="utf-8"))
+
+    assert payload["schema_version"] == "1.0"
+    assert len(payload["fixtures"]) >= 2
+    for fixture in payload["fixtures"]:
+        fixture_path = REPO_ROOT / "benchmarks" / "fixtures" / fixture["path"]
+        assert fixture_path.exists(), fixture["path"]
+        assert fixture["expected_topics"]
+        assert fixture["description"]
 
 
 def test_demo_examples_have_deterministic_mock_verdicts() -> None:

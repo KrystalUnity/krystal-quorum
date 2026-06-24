@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import Any
 
@@ -120,6 +121,12 @@ class OpenAICompatibleReviewer:
             if isinstance(first, dict):
                 message = first.get("message")
                 if isinstance(message, dict):
-                    content = message.get("content") or message.get("reasoning") or ""
-                    return content if isinstance(content, str) else str(content)
+                    content = message.get("content")
+                    if isinstance(content, str) and content.strip():
+                        return content
+                    reasoning = message.get("reasoning")
+                    if isinstance(reasoning, str) and re.search(
+                        r"<json>.*?</json>", reasoning, flags=re.DOTALL | re.IGNORECASE
+                    ):
+                        return reasoning
         return ""

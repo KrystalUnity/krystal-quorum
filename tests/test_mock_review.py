@@ -1,7 +1,7 @@
 import pytest
 
 from krystal_quorum.models import Verdict
-from krystal_quorum.reviewers.base import parse_reviewer_output
+from krystal_quorum.reviewers.base import extract_json, parse_reviewer_output
 from krystal_quorum.reviewers.mock import MockReviewer
 
 
@@ -47,6 +47,43 @@ def test_parse_reviewer_output_tolerates_common_issue_shape_drift():
     assert output.verdict == Verdict.BLOCK
     assert output.blocking_issues[0].claim == "The plan does not name a verification command."
     assert output.suggestions[0].rationale == "This makes the plan verifiable."
+
+
+def test_extract_json_prefers_last_complete_reviewer_object_without_tags():
+    schema_echo = (
+        '{"verdict":"APPROVE","confidence":0.1,'
+        '"blocking_issues":[],"suggestions":[],"per_clause":{}}'
+    )
+    real_answer = (
+        '{"verdict":"REVISE","confidence":0.8,'
+        '"blocking_issues":[{"id":"B1","section":"Tests",'
+        '"claim":"Missing verification","evidence":"No tests listed"}],'
+        '"suggestions":[],"per_clause":{}}'
+    )
+
+    payload = extract_json(f"Example:\n{schema_echo}\nFinal:\n{real_answer}")
+
+    assert payload is not None
+    assert payload["verdict"] == "REVISE"
+    assert payload["blocking_issues"][0]["claim"] == "Missing verification"
+
+
+def test_extract_json_still_prefers_tagged_payload():
+    untagged_real_answer = (
+        '{"verdict":"BLOCK","confidence":0.8,'
+        '"blocking_issues":[{"id":"B1","section":"Safety",'
+        '"claim":"Unsafe","evidence":"Deletes data"}],'
+        '"suggestions":[],"per_clause":{}}'
+    )
+    tagged = (
+        '<json>{"verdict":"APPROVE","confidence":0.9,'
+        '"blocking_issues":[],"suggestions":[],"per_clause":{}}</json>'
+    )
+
+    payload = extract_json(f"{tagged}\n{untagged_real_answer}")
+
+    assert payload is not None
+    assert payload["verdict"] == "APPROVE"
 
 
 def test_unparseable_output_abstains():

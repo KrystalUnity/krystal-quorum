@@ -117,6 +117,53 @@ async def test_openai_compatible_posts_to_chat_completions_and_reads_reasoning()
 
 
 @pytest.mark.asyncio
+async def test_openai_compatible_ignores_untagged_reasoning_json():
+    transport = CaptureTransport(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "reasoning": '{"verdict":"APPROVE","confidence":0.9,"blocking_issues":[],"suggestions":[],"per_clause":{}}'
+                    }
+                }
+            ]
+        }
+    )
+    reviewer = OpenAICompatibleReviewer(
+        reviewer_id="api",
+        model="gpt-test",
+        base_url="https://example.test/v1",
+        api_key="test",
+        transport=transport,
+    )
+
+    output = await reviewer.review_round1("plan", timeout_s=1)
+
+    assert output.verdict == Verdict.ABSTAIN
+
+
+@pytest.mark.asyncio
+async def test_ollama_ignores_untagged_reasoning_json():
+    transport = CaptureTransport(
+        {
+            "message": {
+                "reasoning": '{"verdict":"APPROVE","confidence":0.9,"blocking_issues":[],"suggestions":[],"per_clause":{}}'
+            }
+        }
+    )
+    reviewer = OllamaReviewer(
+        reviewer_id="local",
+        model="qwen2.5:14b",
+        base_url="http://localhost:11434",
+        transport=transport,
+    )
+
+    output = await reviewer.review_round1("plan", timeout_s=1)
+
+    assert output.verdict == Verdict.ABSTAIN
+
+
+@pytest.mark.asyncio
 async def test_openai_compatible_retries_once_when_response_is_malformed():
     transport = SequentialTransport(
         [

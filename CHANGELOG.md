@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 - 2026-06-24
+
+- Added a plan-size guard with rough token estimate before reviewers are built.
+- Made untagged JSON extraction prefer the last complete reviewer-shaped object, reducing schema-echo false parses.
+- Restricted reasoning-only response fallback to explicit `<json>...</json>` payloads.
+- Added public benchmark fixtures and a JSONL benchmark runner for collecting single-reviewer vs quorum evidence.
+
 ## 0.5.1 - 2026-06-24
 
 - Forced collapsed multi-reviewer quorums to `REVISE` and surfaced quorum health in CLI JSON and summaries.

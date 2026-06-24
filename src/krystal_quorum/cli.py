@@ -15,6 +15,7 @@ from krystal_quorum.reconcile import reconcile
 from krystal_quorum.reviewers.base import ReviewerProtocol
 
 app = typer.Typer(help="Preflight review for AI coding plans.")
+DEFAULT_MAX_PLAN_CHARS = 120_000
 
 
 @app.callback()
@@ -30,6 +31,20 @@ def _exit_code(verdict: Verdict) -> int:
     if verdict == Verdict.BLOCK:
         return 2
     return 3
+
+
+def _rough_token_estimate(text: str) -> int:
+    return max(1, (len(text) + 3) // 4)
+
+
+def _plan_size_error(plan_text: str, max_plan_chars: int) -> str | None:
+    if max_plan_chars <= 0 or len(plan_text) <= max_plan_chars:
+        return None
+    return (
+        f"Plan too large: {len(plan_text)} characters "
+        f"(roughly {_rough_token_estimate(plan_text)} tokens) exceeds "
+        f"--max-plan-chars {max_plan_chars}. Split the plan or raise the limit."
+    )
 
 
 async def _run_review(
@@ -82,11 +97,23 @@ def review(
         "--require-diversity",
         help="Exit with a configuration error when reviewer model families are not distinct.",
     ),
+    max_plan_chars: int = typer.Option(
+        DEFAULT_MAX_PLAN_CHARS,
+        "--max-plan-chars",
+        help="Maximum plan size in characters before review. Use 0 to disable.",
+    ),
 ) -> None:
     """Review a markdown coding plan."""
     if not plan.exists():
         typer.echo(f"Plan not found: {plan}", err=True)
         raise typer.Exit(3)
+
+    plan_text = plan.read_text(encoding="utf-8")
+    size_error = _plan_size_error(plan_text, max_plan_chars)
+    if size_error:
+        typer.echo(size_error, err=True)
+        raise typer.Exit(3)
+
     try:
         reviewer_instances = build_reviewers(reviewers, config_path=config)
     except ValueError as exc:
@@ -98,7 +125,6 @@ def review(
         typer.echo(f"reviewer diversity is low: {diversity.reason}", err=True)
         raise typer.Exit(3)
 
-    plan_text = plan.read_text(encoding="utf-8")
     result = asyncio.run(
         _run_review(
             plan,

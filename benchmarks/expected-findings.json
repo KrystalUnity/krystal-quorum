@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "fixtures": [
+    {
+      "path": "missing-acceptance.md",
+      "description": "Plan describes work but has no acceptance criteria.",
+      "expected_topics": ["acceptance.criteria"]
+    },
+    {
+      "path": "missing-rollback.md",
+      "description": "Plan changes persistent behavior but has no rollback or backout path.",
+      "expected_topics": ["rollback.plan", "tests.verification"]
+    }
+  ]
+}

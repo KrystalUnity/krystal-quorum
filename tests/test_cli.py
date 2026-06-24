@@ -129,6 +129,37 @@ def test_review_command_can_require_reviewer_diversity(tmp_path):
     assert "reviewer diversity is low" in result.output
 
 
+def test_review_command_rejects_oversized_plan_before_reviewers_run(tmp_path, monkeypatch):
+    plan = tmp_path / "huge-plan.md"
+    plan.write_text("x" * 101, encoding="utf-8")
+    called = False
+
+    def fail_if_called(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("reviewers should not be built for oversized plans")
+
+    monkeypatch.setattr("krystal_quorum.cli.build_reviewers", fail_if_called)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "mock",
+            "--max-plan-chars",
+            "100",
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert called is False
+    assert "Plan too large" in result.output
+    assert "101 characters" in result.output
+    assert "roughly 26 tokens" in result.output
+
+
 def test_review_command_can_require_command_reviewer_family_override(tmp_path):
     plan = tmp_path / "plan.md"
     plan.write_text("## Acceptance\n- Works", encoding="utf-8")
