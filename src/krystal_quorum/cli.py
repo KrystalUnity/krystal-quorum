@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import Literal
 
 import typer
 
 from krystal_quorum.config import build_reviewers
 from krystal_quorum.diversity import analyze_reviewer_objects
-from krystal_quorum.init_command import InitError, install_integration_templates
+from krystal_quorum.formatting import json_output, pretty_output
+from krystal_quorum.init_command import InitError, available_targets, install_integration_templates
 from krystal_quorum.models import DiversityReport, ReconciledVerdict, Verdict
 from krystal_quorum.persist import persist_run
 from krystal_quorum.reconcile import reconcile
@@ -102,6 +104,11 @@ def review(
         "--max-plan-chars",
         help="Maximum plan size in characters before review. Use 0 to disable.",
     ),
+    output_format: Literal["json", "pretty"] = typer.Option(
+        "json",
+        "--format",
+        help="Output format for stdout: json or pretty.",
+    ),
 ) -> None:
     """Review a markdown coding plan."""
     if not plan.exists():
@@ -135,35 +142,19 @@ def review(
         )
     )
     run_dir = persist_run(out_dir, plan, plan_text, result)
-    output = {
-        "schema_version": result.schema_version,
-        "verdict": result.merged_verdict.value,
-        "confidence": result.confidence,
-        "reviewers_used": result.reviewers_used,
-        "diversity": result.diversity.status,
-        "diversity_reason": result.diversity.reason,
-        "diversity_reviewers": [
-            reviewer.model_dump(mode="json") for reviewer in result.diversity.reviewers
-        ],
-        "abstained_reviewers": result.abstained_reviewers,
-        "unresolved_for_human": result.unresolved_for_human,
-        "output_dir": str(run_dir),
-    }
-    if result.round2_delta is not None:
-        output["round2_delta"] = result.round2_delta
-        output["round2_comparisons"] = [
-            comparison.model_dump(mode="json") for comparison in result.round2_comparisons
-        ]
-    typer.echo(json.dumps(output, indent=2))
+    if output_format == "pretty":
+        typer.echo(pretty_output(result, run_dir))
+    else:
+        typer.echo(json.dumps(json_output(result, run_dir), indent=2))
     raise typer.Exit(_exit_code(result.merged_verdict))
 
 
 @app.command()
 def init(
-    target: str = typer.Option(
-        ...,
+    target: str | None = typer.Option(
+        None,
         "--target",
-        help="Integration target: claude-code, hermes, or openclaw.",
+        help="Integration target: claude-code, codex, hermes, claw, openclaw, opencode, or all.",
     ),
     path: Path = typer.Option(
         Path("."),
@@ -175,8 +166,21 @@ def init(
         "--force",
         help="Overwrite existing generated integration files.",
     ),
+    list_targets: bool = typer.Option(
+        False,
+        "--list-targets",
+        help="List supported integration targets and exit.",
+    ),
 ) -> None:
     """Install project-local agent integration templates."""
+    if list_targets:
+        typer.echo("Supported init targets:")
+        for item in available_targets(include_all=True):
+            typer.echo(f"- {item}")
+        return
+    if target is None:
+        typer.echo("Missing option '--target'. Use --list-targets to see choices.", err=True)
+        raise typer.Exit(3)
     try:
         installed = install_integration_templates(target, path, force=force)
     except InitError as exc:

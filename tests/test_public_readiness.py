@@ -11,15 +11,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.5.3"
+    assert pyproject["project"]["version"] == "0.6.0"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
     assert pyproject["tool"]["setuptools"]["package-data"]["krystal_quorum"] == [
+        "templates/agent_integrations/common/quorum-review.md",
         "templates/agent_integrations/claude-code/.claude/commands/quorum-review.md",
         "templates/agent_integrations/claude-code/.claude/skills/krystal-quorum-review/SKILL.md",
+        "templates/agent_integrations/codex/.codex/skills/krystal-quorum-review/SKILL.md",
         "templates/agent_integrations/hermes/.hermes/skills/krystal-quorum-plan-review/SKILL.md",
         "templates/agent_integrations/openclaw/.openclaw/skills/krystal-quorum-openclaw-review/SKILL.md",
+        "templates/agent_integrations/opencode/.opencode/skills/krystal-quorum-review.md",
     ]
     assert "build>=1.2" in pyproject["project"]["optional-dependencies"]["dev"]
     assert "twine>=5" in pyproject["project"]["optional-dependencies"]["dev"]
@@ -34,6 +37,8 @@ def test_public_release_files_exist() -> None:
         ".github/ISSUE_TEMPLATE/feature_request.yml",
         "docs/architecture/consensus-matching.md",
         "docs/architecture/local-command-reviewers.md",
+        "docs/agent-import-packs.md",
+        "docs/prompts.md",
         "docs/demo.md",
         "docs/assets/quorum-demo.svg",
         "examples/good-plan.md",

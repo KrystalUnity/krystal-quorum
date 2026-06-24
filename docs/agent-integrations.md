@@ -28,9 +28,14 @@ krystal-quorum review examples/bad-plan.md --reviewers mock
 Install project-local agent integration files:
 
 ```bash
+krystal-quorum init --list-targets
 krystal-quorum init --target claude-code
+krystal-quorum init --target codex
 krystal-quorum init --target hermes
+krystal-quorum init --target claw
 krystal-quorum init --target openclaw
+krystal-quorum init --target opencode
+krystal-quorum init --target all
 ```
 
 ## Plan File Shape
@@ -87,11 +92,30 @@ Typical Claude Code workflow:
 2. Invoke the skill or command, or ask Claude to run:
 
 ```bash
-krystal-quorum review docs/plans/<change>.md --reviewers mock
+krystal-quorum review docs/plans/<change>.md --reviewers mock --format pretty
 ```
 
 3. Replace `mock` with real reviewers before trusting the result.
 4. Continue only after handling `REVISE` or `BLOCK` findings.
+
+## Use Quorum With Codex
+
+Project-level Codex-style skill install:
+
+```bash
+krystal-quorum init --target codex
+```
+
+The command installs:
+
+```bash
+.codex/skills/krystal-quorum-review/SKILL.md
+.krystal-quorum/agents/quorum-review.md
+```
+
+Ask Codex to run the skill before implementing a substantial plan. The shared
+workflow file under `.krystal-quorum/agents/` keeps the review gate consistent
+with the other agent packs.
 
 ## Use Quorum With Hermes
 
@@ -129,9 +153,32 @@ OpenClaw-style coordinator:
 krystal-quorum init --target openclaw
 ```
 
+`claw` is an alias for the same pack:
+
+```bash
+krystal-quorum init --target claw
+```
+
 Use Quorum before dispatching implementation agents. Attach the Quorum artifact
 path to any downstream worker so it can see what was approved, revised, or
 blocked.
+
+## Use Quorum With OpenCode
+
+Install the OpenCode-compatible instruction:
+
+```bash
+krystal-quorum init --target opencode
+```
+
+The command installs:
+
+```bash
+.opencode/skills/krystal-quorum-review.md
+.krystal-quorum/agents/quorum-review.md
+```
+
+Use the instruction as a pre-implementation gate for markdown plans.
 
 ## Use Quorum Inside CI
 

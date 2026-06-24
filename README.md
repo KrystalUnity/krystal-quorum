@@ -39,26 +39,35 @@ For development from a checkout:
 python -m pip install -e ".[dev]"
 ```
 
-Agent integration packs for Claude Code, Hermes-style runners, OpenClaw-style
-coordinators, and CI live in [docs/agent-integrations.md](docs/agent-integrations.md).
+Agent integration packs for Claude Code, Codex, Hermes-style runners,
+OpenClaw/Claw-style coordinators, OpenCode, and CI live in
+[docs/agent-integrations.md](docs/agent-integrations.md) and
+[docs/agent-import-packs.md](docs/agent-import-packs.md).
 
 Install project-local agent skills with:
 
 ```bash
 krystal-quorum init --target claude-code
+krystal-quorum init --target codex
 krystal-quorum init --target hermes
+krystal-quorum init --target claw
 krystal-quorum init --target openclaw
+krystal-quorum init --target opencode
+krystal-quorum init --target all
 ```
+
+List supported targets with `krystal-quorum init --list-targets`.
 
 ## 60-Second Demo
 
 Run the no-key mock reviewer against the deliberately weak example plan:
 
 ```bash
-krystal-quorum review examples/bad-plan.md --reviewers mock
+krystal-quorum review examples/bad-plan.md --reviewers mock --format pretty
 ```
 
-Example output:
+JSON remains available for scripts with `--format json`, which is also the
+default. Example JSON output:
 
 ```json
 {

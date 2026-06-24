@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 - 2026-06-24
+
+- Added universal agent import packs with `init --target codex|claw|opencode|all` and `init --list-targets`.
+- Installed a shared `.krystal-quorum/agents/quorum-review.md` workflow with every agent pack.
+- Added `--format json|pretty`; JSON remains the default and pretty output gives a terminal-friendly review card.
+- Added public docs for agent import packs and the reviewer prompt contract.
+
 ## 0.5.3 - 2026-06-24
 
 - Expanded the reviewer rubric contract with `security.risk`, `dependencies.scope`, and `observability.plan` clause keys.

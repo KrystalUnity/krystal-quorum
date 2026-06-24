@@ -200,11 +200,31 @@ def test_review_command_outputs_diversity_and_schema_version(tmp_path):
     plan = tmp_path / "plan.md"
     plan.write_text("## Acceptance\n- Works", encoding="utf-8")
 
-    result = CliRunner().invoke(app, ["review", str(plan), "--reviewers", "mock"])
+    result = CliRunner().invoke(
+        app, ["review", str(plan), "--reviewers", "mock", "--format", "json"]
+    )
 
     assert result.exit_code == 0
     assert '"schema_version": "1.2"' in result.output
     assert '"diversity": "ok"' in result.output
+
+
+def test_review_command_pretty_format_outputs_terminal_card(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("Build a CLI with no success criteria.", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        ["review", str(plan), "--reviewers", "mock", "--format", "pretty"],
+    )
+
+    assert result.exit_code == 1
+    assert "Krystal Quorum" in result.output
+    assert "VERDICT: REVISE" in result.output
+    assert "Singleton Blockers" in result.output
+    assert "Human Triage" in result.output
+    assert "Artifacts:" in result.output
+    assert '"schema_version"' not in result.output
 
 
 def test_review_command_outputs_diversity_reason_and_round2_comparisons(tmp_path):
