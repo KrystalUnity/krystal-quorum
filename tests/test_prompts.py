@@ -15,8 +15,12 @@ def test_round1_prompt_specifies_issue_suggestion_and_clause_schema():
     assert '"rationale": "Why this improves safety or verifiability."' in prompt
     assert '"per_clause": {' in prompt
     assert '"tests.verification": "SATISFIED"' in prompt
+    assert '"security.risk": "UNCLEAR"' in prompt
+    assert '"dependencies.scope": "N/A"' in prompt
+    assert '"observability.plan": "N/A"' in prompt
     assert "Use these exact per_clause keys when judging plan coverage." in prompt
     assert "Only use per_clause values SATISFIED, UNSATISFIED, UNCLEAR, or N/A." in prompt
+    assert "security, dependency, and observability gaps" in prompt
 
 
 def test_round2_prompt_embeds_peer_findings_as_json():

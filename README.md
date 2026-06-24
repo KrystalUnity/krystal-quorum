@@ -122,6 +122,15 @@ Prefer instruct-tuned models for reviewer adapters. Reasoning-heavy models can
 spend most of the default timeout on internal thinking and may abstain if they
 do not return the strict JSON contract in time.
 
+For Ollama-compatible servers that support reasoning controls, project config
+can disable thinking and cap generation:
+
+```toml
+[ollama]
+think = false
+num_predict = 1024
+```
+
 If Ollama is running somewhere other than `http://localhost:11434`, set
 `OLLAMA_BASE_URL`:
 
@@ -264,7 +273,9 @@ reported system confidence.
 Krystal Quorum is safety-biased rather than majority-rule voting. A single
 `BLOCK` verdict blocks the merged result, and a single unresolved blocking issue
 forces at least `REVISE`. When two or more reviewers report substantially
-similar blocking issues, Quorum promotes that finding to a shared blocker.
+similar blocking issues, Quorum promotes that finding to a shared blocker. This
+single-`BLOCK` veto is intentional fail-safe behavior; run Round 2 or inspect
+the artifacts when a lone reviewer disagrees with the rest of the quorum.
 
 Consensus matching is deterministic and explainable. Quorum groups reviewer
 findings with a small public concept matcher for common review areas such as
@@ -284,9 +295,10 @@ downgrade: schema-1.1-only consumers should pin a v0.3.x release or revert the
 v0.4 change.
 
 Reviewers are asked to emit `per_clause` statuses for common plan clauses such
-as acceptance criteria, rollback, tests, and safety assumptions. Contradictory
-clause statuses are surfaced for human triage instead of being averaged away.
-Common key variants such as `acceptance_criteria` are normalized before
+as acceptance criteria, rollback, tests, safety assumptions, security risk,
+dependency scope, and observability plan. Contradictory clause statuses are
+surfaced for human triage instead of being averaged away. Common key variants
+such as `acceptance_criteria` and `security_risk` are normalized before
 comparison; unknown keys are flagged in `unresolved_for_human`.
 
 The `confidence` field is a system-adjusted signal. It starts from reviewer

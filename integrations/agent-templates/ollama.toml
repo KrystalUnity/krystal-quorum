@@ -1,5 +1,13 @@
-# Ollama reviewers do not require TOML configuration in Krystal Quorum.
-# Select them directly with --reviewers and configure the endpoint with OLLAMA_BASE_URL.
+# Ollama reviewers can run with no TOML configuration. Select them directly
+# with --reviewers and configure the endpoint with OLLAMA_BASE_URL.
+#
+# Optional: for Ollama-compatible servers that support reasoning controls, use
+# these settings to keep reasoning-heavy models from spending the full timeout
+# on thinking tokens.
+[ollama]
+think = false
+num_predict = 1024
+
 [reviewers]
 #
 # Example:

@@ -32,6 +32,16 @@ CLAUSE_KEY_ALIASES = {
     "verification": "tests.verification",
     "safety.assumptions": "safety.assumptions",
     "safety": "safety.assumptions",
+    "security.risk": "security.risk",
+    "security": "security.risk",
+    "risk": "security.risk",
+    "dependencies.scope": "dependencies.scope",
+    "dependency.scope": "dependencies.scope",
+    "dependencies": "dependencies.scope",
+    "dependency": "dependencies.scope",
+    "observability.plan": "observability.plan",
+    "observability": "observability.plan",
+    "monitoring": "observability.plan",
 }
 
 

@@ -244,6 +244,27 @@ def test_reconcile_normalizes_per_clause_keys_for_contradictions():
     assert result.contradictions[0].severity == "high"
 
 
+def test_reconcile_normalizes_extended_rubric_clause_keys():
+    left = output("a", Verdict.APPROVE)
+    left.per_clause = {"Security Risk": ClauseStatus.SATISFIED}
+    right = output("b", Verdict.REVISE)
+    right.per_clause = {"security_risk": ClauseStatus.UNCLEAR}
+
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text="plan",
+        reviewers_used=["a", "b"],
+        round1_outputs=[left, right],
+        round2_outputs=[],
+    )
+
+    assert result.merged_verdict == Verdict.REVISE
+    assert result.contradictions[0].clause_id == "security.risk"
+    assert result.unresolved_for_human == [
+        "Contradiction on security.risk: human triage required."
+    ]
+
+
 def test_reconcile_flags_unknown_per_clause_keys():
     left = output("a", Verdict.APPROVE)
     left.per_clause = {"deployment.window": ClauseStatus.SATISFIED}

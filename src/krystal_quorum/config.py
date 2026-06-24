@@ -28,11 +28,14 @@ def build_reviewers(
             continue
         if name.startswith("ollama:"):
             model = raw_name.split(":", 1)[1].strip()
+            ollama_options = _ollama_options(config)
             reviewers.append(
                 OllamaReviewer(
                     reviewer_id=f"ollama:{model}",
                     model=model,
                     base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                    think=_optional_bool(ollama_options.get("think"), "ollama.think"),
+                    options=ollama_options.get("options"),
                 )
             )
             continue
@@ -116,6 +119,35 @@ def _build_command_reviewer(
     )
 
 
+def _ollama_options(config: dict[str, Any]) -> dict[str, Any]:
+    raw = config.get("ollama")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError("ollama config must be a table")
+
+    options: dict[str, Any] = {}
+    num_predict = raw.get("num_predict")
+    if num_predict is not None:
+        options["num_predict"] = _optional_int(num_predict, "ollama.num_predict")
+
+    raw_options = raw.get("options")
+    if raw_options is not None:
+        if not isinstance(raw_options, dict):
+            raise ValueError("ollama.options must be a table")
+        for key, value in raw_options.items():
+            if not isinstance(key, str):
+                raise ValueError("ollama.options keys must be strings")
+            if not isinstance(value, str | int | float | bool):
+                raise ValueError(f"ollama.options.{key} must be a scalar value")
+            options[key] = value
+
+    return {
+        "think": raw.get("think"),
+        "options": options,
+    }
+
+
 def _optional_path(value: Any, base_dir: Path) -> Path | None:
     if value is None:
         return None
@@ -131,6 +163,20 @@ def _optional_number(value: Any, name: str, default: float | None = None) -> flo
     if not isinstance(value, int | float):
         raise ValueError(f"{name} must be a number")
     return float(value)
+
+
+def _optional_int(value: Any, name: str) -> int:
+    if not isinstance(value, int):
+        raise ValueError(f"{name} must be an integer")
+    return value
+
+
+def _optional_bool(value: Any, name: str) -> bool | None:
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be a boolean")
+    return value
 
 
 def _optional_string(value: Any, name: str) -> str | None:

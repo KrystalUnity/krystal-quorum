@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 - 2026-06-24
+
+- Expanded the reviewer rubric contract with `security.risk`, `dependencies.scope`, and `observability.plan` clause keys.
+- Normalized aliases for the expanded rubric keys before contradiction detection.
+- Added optional Ollama reasoning controls via `[ollama] think = false` and `num_predict`.
+- Documented that the single-`BLOCK` veto is intentional fail-safe behavior, not majority voting.
+
 ## 0.5.2 - 2026-06-24
 
 - Added a plan-size guard with rough token estimate before reviewers are built.

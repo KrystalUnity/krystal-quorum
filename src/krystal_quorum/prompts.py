@@ -34,7 +34,10 @@ Return JSON only inside <json>...</json> tags. Use exactly this schema. Do not a
     "acceptance.criteria": "UNSATISFIED",
     "rollback.plan": "UNCLEAR",
     "tests.verification": "SATISFIED",
-    "safety.assumptions": "N/A"
+    "safety.assumptions": "N/A",
+    "security.risk": "UNCLEAR",
+    "dependencies.scope": "N/A",
+    "observability.plan": "N/A"
   }}
 }}
 </json>
@@ -43,7 +46,8 @@ Use verdict APPROVE, REVISE, or BLOCK.
 Use these exact per_clause keys when judging plan coverage.
 Only use per_clause values SATISFIED, UNSATISFIED, UNCLEAR, or N/A.
 Use an empty array when there are no blocking issues or suggestions.
-Flag missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps, and test gaps.
+Flag missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps,
+test gaps, security, dependency, and observability gaps.
 
 PLAN:
 ---

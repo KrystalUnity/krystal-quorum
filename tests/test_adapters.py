@@ -1,6 +1,9 @@
+import json
+
 import httpx
 import pytest
 
+from krystal_quorum.config import build_reviewers
 from krystal_quorum.models import Verdict
 from krystal_quorum.reviewers.ollama import OllamaReviewer
 from krystal_quorum.reviewers.openai_compatible import OpenAICompatibleReviewer
@@ -40,6 +43,24 @@ class SequentialResponseTransport(httpx.AsyncBaseTransport):
         return response
 
 
+def test_config_can_set_ollama_reasoning_controls(tmp_path):
+    config = tmp_path / "krystal-quorum.toml"
+    config.write_text(
+        """
+        [ollama]
+        think = false
+        num_predict = 512
+        """,
+        encoding="utf-8",
+    )
+
+    reviewer = build_reviewers("ollama:qwen3.5:14b", config_path=config)[0]
+
+    assert isinstance(reviewer, OllamaReviewer)
+    assert reviewer.think is False
+    assert reviewer.options == {"num_predict": 512}
+
+
 @pytest.mark.asyncio
 async def test_ollama_posts_to_api_chat_and_reads_content():
     transport = CaptureTransport(
@@ -60,6 +81,32 @@ async def test_ollama_posts_to_api_chat_and_reads_content():
 
     assert output.verdict == Verdict.APPROVE
     assert transport.requests[0].url.path == "/api/chat"
+
+
+@pytest.mark.asyncio
+async def test_ollama_sends_reasoning_controls_when_configured():
+    transport = CaptureTransport(
+        {
+            "message": {
+                "content": '<json>{"verdict":"APPROVE","confidence":0.9,"blocking_issues":[],"suggestions":[],"per_clause":{}}</json>'
+            }
+        }
+    )
+    reviewer = OllamaReviewer(
+        reviewer_id="local",
+        model="qwen3.5:14b",
+        base_url="http://localhost:11434",
+        transport=transport,
+        think=False,
+        options={"num_predict": 512},
+    )
+
+    output = await reviewer.review_round1("## Acceptance\n- Works", timeout_s=1)
+
+    body = json.loads(transport.requests[0].content)
+    assert output.verdict == Verdict.APPROVE
+    assert body["think"] is False
+    assert body["options"]["num_predict"] == 512
 
 
 @pytest.mark.asyncio

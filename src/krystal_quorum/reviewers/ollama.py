@@ -30,11 +30,15 @@ class OllamaReviewer:
         model: str,
         base_url: str = "http://localhost:11434",
         transport: httpx.AsyncBaseTransport | None = None,
+        think: bool | None = None,
+        options: dict[str, Any] | None = None,
     ) -> None:
         self.id = reviewer_id
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.transport = transport
+        self.think = think
+        self.options = options or {}
 
     async def review_round1(self, plan_text: str, *, timeout_s: int) -> ReviewerOutput:
         return await self._review(round1_prompt(self.id, plan_text), 1, timeout_s)
@@ -56,14 +60,16 @@ class OllamaReviewer:
                     async with httpx.AsyncClient(
                         transport=self.transport, timeout=timeout_s
                     ) as client:
-                        response = await client.post(
-                            f"{self.base_url}/api/chat",
-                            json={
-                                "model": self.model,
-                                "stream": False,
-                                "messages": [{"role": "user", "content": attempt_prompt}],
-                            },
-                        )
+                        payload: dict[str, Any] = {
+                            "model": self.model,
+                            "stream": False,
+                            "messages": [{"role": "user", "content": attempt_prompt}],
+                        }
+                        if self.think is not None:
+                            payload["think"] = self.think
+                        if self.options:
+                            payload["options"] = self.options
+                        response = await client.post(f"{self.base_url}/api/chat", json=payload)
                         response.raise_for_status()
                         raw = self._extract_text(response.json())
                     break
