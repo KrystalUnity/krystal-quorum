@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.1 - 2026-06-25
+
+- Fixed public install guidance to use a source checkout until the package is
+  published to PyPI.
+- Promoted the pretty terminal output and agent import packs in the README
+  quickstart path.
+- Updated demo docs and the animated terminal asset to show `--format pretty`.
+- Added a public readiness test so unpublished PyPI install commands do not
+  reappear in launch docs.
+
 ## 0.6.0 - 2026-06-24
 
 - Added universal agent import packs with `init --target codex|claw|opencode|all` and `init --list-targets`.

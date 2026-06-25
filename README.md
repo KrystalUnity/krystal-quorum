@@ -17,57 +17,89 @@ Krystal Quorum is not an agent runtime and not a code generator. It is a review 
 
 ## Quickstart
 
+Until Krystal Quorum is published to PyPI, install it from a source checkout:
+
 ```bash
-python -m pip install krystal-quorum
 git clone https://github.com/KrystalUnity/krystal-quorum.git
 cd krystal-quorum
-krystal-quorum review examples/bad-plan.md --reviewers mock
+python -m pip install .
+python -m krystal_quorum review examples/bad-plan.md --reviewers mock --format pretty
 ```
 
-If you are already in a checkout, only the install and review commands are
-needed. The command writes an append-only review run under
-`.krystal-quorum/reviews/`.
+The no-key mock reviewer returns `REVISE` for the deliberately weak plan and
+writes an append-only review run under `.krystal-quorum/reviews/`.
 
 By default Quorum rejects plans over 120,000 characters before reviewers are
 constructed, with a rough token estimate in the error. Use `--max-plan-chars`
 to raise the limit or `--max-plan-chars 0` to disable the guard for a
 controlled run.
 
-For development from a checkout:
+For development from the checkout:
 
 ```bash
 python -m pip install -e ".[dev]"
 ```
 
-Agent integration packs for Claude Code, Codex, Hermes-style runners,
-OpenClaw/Claw-style coordinators, OpenCode, and CI live in
-[docs/agent-integrations.md](docs/agent-integrations.md) and
-[docs/agent-import-packs.md](docs/agent-import-packs.md).
-
-Install project-local agent skills with:
+## See It Work
 
 ```bash
-krystal-quorum init --target claude-code
-krystal-quorum init --target codex
-krystal-quorum init --target hermes
-krystal-quorum init --target claw
-krystal-quorum init --target openclaw
-krystal-quorum init --target opencode
-krystal-quorum init --target all
+python -m krystal_quorum review examples/bad-plan.md --reviewers mock --format pretty
 ```
 
-List supported targets with `krystal-quorum init --list-targets`.
+```text
++ Krystal Quorum ------------------------------------------------------------+
+VERDICT: REVISE | Confidence: 0.77
+Reviewers: mock
+Diversity: ok
 
-## 60-Second Demo
+Singleton Blockers (1)
+- [Acceptance] The plan does not include explicit acceptance criteria.
 
-Run the no-key mock reviewer against the deliberately weak example plan:
+Artifacts: .krystal-quorum/reviews/...
++----------------------------------------------------------------------------+
+```
+
+`REVISE` exits with code `1`, so CI scripts can fail fast when a plan needs
+work. Review artifacts are written locally and ignored by git.
+
+Now run the fixed plan:
 
 ```bash
-krystal-quorum review examples/bad-plan.md --reviewers mock --format pretty
+python -m krystal_quorum review examples/good-plan.md --reviewers mock --format pretty
 ```
+
+The mock reviewer sees explicit acceptance criteria and returns `APPROVE`
+with exit code `0`. See [docs/demo.md](docs/demo.md) for a short transcript and
+terminal card.
 
 JSON remains available for scripts with `--format json`, which is also the
-default. Example JSON output:
+default.
+
+## Agent Import Packs
+
+Install project-local skills or prompt files for the agents you already use:
+
+| Target | Command |
+| --- | --- |
+| Claude Code | `krystal-quorum init --target claude-code` |
+| Codex | `krystal-quorum init --target codex` |
+| Hermes-style runners | `krystal-quorum init --target hermes` |
+| Claw / OpenClaw | `krystal-quorum init --target claw` |
+| OpenCode | `krystal-quorum init --target opencode` |
+| Everything | `krystal-quorum init --target all` |
+
+The packs share one workflow file at
+`.krystal-quorum/agents/quorum-review.md`, so every agent gets the same review
+gate. Details live in [docs/agent-integrations.md](docs/agent-integrations.md)
+and [docs/agent-import-packs.md](docs/agent-import-packs.md).
+
+List supported targets with:
+
+```bash
+krystal-quorum init --list-targets
+```
+
+Example JSON output:
 
 ```json
 {
@@ -81,19 +113,6 @@ default. Example JSON output:
   "output_dir": ".krystal-quorum/reviews/bad-plan_20260619-102618"
 }
 ```
-
-`REVISE` exits with code `1`, so CI scripts can fail fast when a plan needs
-work. Review artifacts are written locally and ignored by git.
-
-Now run the fixed plan:
-
-```bash
-krystal-quorum review examples/good-plan.md --reviewers mock
-```
-
-The mock reviewer sees explicit acceptance criteria and returns `APPROVE`
-with exit code `0`. See [docs/demo.md](docs/demo.md) for a short transcript and
-terminal card.
 
 ## Reviewers
 
@@ -115,7 +134,7 @@ Use the mock reviewer first to prove the workflow works. It uses no network and
 requires no keys:
 
 ```bash
-krystal-quorum review examples/bad-plan.md --reviewers mock
+krystal-quorum review examples/bad-plan.md --reviewers mock --format pretty
 ```
 
 ### Local Ollama

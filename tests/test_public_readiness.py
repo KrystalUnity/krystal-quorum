@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.6.0"
+    assert pyproject["project"]["version"] == "0.6.1"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
@@ -76,6 +76,16 @@ def test_public_docs_do_not_reference_private_server_paths() -> None:
         text = path.read_text(encoding="utf-8")
         for phrase in forbidden:
             assert phrase not in text, f"{phrase!r} leaked in {path.relative_to(REPO_ROOT)}"
+
+
+def test_public_docs_do_not_advertise_unpublished_pypi_install() -> None:
+    for path in [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "docs" / "agent-integrations.md",
+    ]:
+        text = path.read_text(encoding="utf-8")
+        assert "pip install krystal-quorum" not in text
+        assert "python -m pip install krystal-quorum" not in text
 
 
 def test_integration_toml_templates_parse() -> None:
