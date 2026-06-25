@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.3 - 2026-06-25
+
+- Added `krystal-quorum demo` for a no-clone, no-key bundled mock review.
+- Bundled the good and bad demo plans inside the wheel.
+- Updated README, demo docs, and the animated terminal asset around the
+  two-command PyPI onboarding path.
+
 ## 0.6.2 - 2026-06-25
 
 - Published Krystal Quorum to PyPI.

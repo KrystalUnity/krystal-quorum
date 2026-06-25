@@ -7,7 +7,7 @@ Krystal Quorum can be tried without API keys by using the deterministic `mock` r
 ## Weak Plan
 
 ```bash
-krystal-quorum review examples/bad-plan.md --reviewers mock --format pretty
+krystal-quorum demo
 ```
 
 Expected result:
@@ -21,12 +21,13 @@ Singleton Blockers (1)
 Artifacts: .krystal-quorum/reviews/...
 ```
 
-The mock reviewer flags the missing acceptance criteria and exits with code `1`.
+The mock reviewer flags the missing acceptance criteria. The demo command exits
+with code `0` when this expected `REVISE` verdict appears.
 
 ## Fixed Plan
 
 ```bash
-krystal-quorum review examples/good-plan.md --reviewers mock --format pretty
+krystal-quorum demo --plan good
 ```
 
 Expected result:

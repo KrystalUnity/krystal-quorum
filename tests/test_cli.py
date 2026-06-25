@@ -227,6 +227,27 @@ def test_review_command_pretty_format_outputs_terminal_card(tmp_path):
     assert '"schema_version"' not in result.output
 
 
+def test_demo_command_runs_bundled_bad_plan_from_empty_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["demo"])
+
+    assert result.exit_code == 0
+    assert "VERDICT: REVISE" in result.output
+    assert "examples" not in result.output
+    assert list((tmp_path / ".krystal-quorum" / "reviews").glob("bad-plan_*"))
+
+
+def test_demo_command_can_run_bundled_good_plan(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["demo", "--plan", "good"])
+
+    assert result.exit_code == 0
+    assert "VERDICT: APPROVE" in result.output
+    assert list((tmp_path / ".krystal-quorum" / "reviews").glob("good-plan_*"))
+
+
 def test_review_command_outputs_diversity_reason_and_round2_comparisons(tmp_path):
     plan = tmp_path / "plan.md"
     plan.write_text("## Acceptance\n- Works", encoding="utf-8")

@@ -35,10 +35,10 @@
   <circle cx="98" cy="62" r="7" fill="#ffd166"/>
   <circle cx="122" cy="62" r="7" fill="#64d68a"/>
   <text x="150" y="69" class="text muted">krystal-quorum demo</text>
-  <text x="72" y="130" class="text line l1">$ krystal-quorum review examples/bad-plan.md --reviewers mock --format pretty</text>
+  <text x="72" y="130" class="text line l1">$ krystal-quorum demo</text>
   <text x="72" y="170" class="text line l2">VERDICT: <tspan class="revise">REVISE</tspan> | Confidence: 0.77</text>
   <text x="72" y="210" class="text line l3">Blocker: missing acceptance criteria</text>
-  <text x="72" y="260" class="text line l4">$ krystal-quorum review examples/good-plan.md --reviewers mock --format pretty</text>
+  <text x="72" y="260" class="text line l4">$ krystal-quorum demo --plan good</text>
   <text x="72" y="300" class="text line l5">VERDICT: <tspan class="approve">APPROVE</tspan> | Confidence: 0.90</text>
   <text x="72" y="340" class="text line l6">artifacts: .krystal-quorum/reviews/...</text>
   <rect class="cursor" x="430" y="322" width="12" height="24"/>

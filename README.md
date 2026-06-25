@@ -21,9 +21,14 @@ Install from PyPI:
 
 ```bash
 python -m pip install krystal-quorum
+krystal-quorum demo
 ```
 
-Clone the repo only if you want the bundled example plans:
+That runs a bundled weak plan with the no-key mock reviewer, prints `REVISE`,
+and exits `0` because the demo behaved as expected. If your Python script
+directory is not on `PATH`, use `python -m krystal_quorum demo`.
+
+Clone the repo only if you want to edit the example plans:
 
 ```bash
 git clone https://github.com/KrystalUnity/krystal-quorum.git
@@ -48,7 +53,7 @@ python -m pip install -e ".[dev]"
 ## See It Work
 
 ```bash
-python -m krystal_quorum review examples/bad-plan.md --reviewers mock --format pretty
+krystal-quorum demo
 ```
 
 ```text
@@ -64,13 +69,15 @@ Artifacts: .krystal-quorum/reviews/...
 +----------------------------------------------------------------------------+
 ```
 
-`REVISE` exits with code `1`, so CI scripts can fail fast when a plan needs
-work. Review artifacts are written locally and ignored by git.
+The demo command exits with code `0` when the expected demo verdict appears.
+Normal `review` commands still use verdict exit codes, so `REVISE` exits with
+code `1` and CI scripts can fail fast when a real plan needs work. Review
+artifacts are written locally and ignored by git.
 
 Now run the fixed plan:
 
 ```bash
-python -m krystal_quorum review examples/good-plan.md --reviewers mock --format pretty
+krystal-quorum demo --plan good
 ```
 
 The mock reviewer sees explicit acceptance criteria and returns `APPROVE`
@@ -139,7 +146,7 @@ Use the mock reviewer first to prove the workflow works. It uses no network and
 requires no keys:
 
 ```bash
-krystal-quorum review examples/bad-plan.md --reviewers mock --format pretty
+krystal-quorum demo
 ```
 
 ### Local Ollama

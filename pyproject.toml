@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "krystal-quorum"
-version = "0.6.2"
+version = "0.6.3"
 description = "Preflight review for AI coding plans."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -44,6 +44,8 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 krystal_quorum = [
+  "examples/bad-plan.md",
+  "examples/good-plan.md",
   "templates/agent_integrations/common/quorum-review.md",
   "templates/agent_integrations/claude-code/.claude/commands/quorum-review.md",
   "templates/agent_integrations/claude-code/.claude/skills/krystal-quorum-review/SKILL.md",

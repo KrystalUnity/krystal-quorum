@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
@@ -18,6 +19,10 @@ from krystal_quorum.reviewers.base import ReviewerProtocol
 
 app = typer.Typer(help="Preflight review for AI coding plans.")
 DEFAULT_MAX_PLAN_CHARS = 120_000
+DEMO_PLANS = {
+    "bad": "bad-plan.md",
+    "good": "good-plan.md",
+}
 
 
 @app.callback()
@@ -47,6 +52,12 @@ def _plan_size_error(plan_text: str, max_plan_chars: int) -> str | None:
         f"(roughly {_rough_token_estimate(plan_text)} tokens) exceeds "
         f"--max-plan-chars {max_plan_chars}. Split the plan or raise the limit."
     )
+
+
+def _demo_plan_text(plan_name: Literal["bad", "good"]) -> tuple[Path, str]:
+    file_name = DEMO_PLANS[plan_name]
+    resource = files("krystal_quorum").joinpath("examples", file_name)
+    return Path(file_name), resource.read_text(encoding="utf-8")
 
 
 async def _run_review(
@@ -147,6 +158,47 @@ def review(
     else:
         typer.echo(json.dumps(json_output(result, run_dir), indent=2))
     raise typer.Exit(_exit_code(result.merged_verdict))
+
+
+@app.command()
+def demo(
+    plan: Literal["bad", "good"] = typer.Option(
+        "bad",
+        "--plan",
+        help="Bundled demo plan to review: bad or good.",
+    ),
+    out_dir: Path = typer.Option(
+        Path(".krystal-quorum/reviews"),
+        help="Directory where demo review runs are written.",
+    ),
+    output_format: Literal["json", "pretty"] = typer.Option(
+        "pretty",
+        "--format",
+        help="Output format for stdout: json or pretty.",
+    ),
+) -> None:
+    """Run a no-key review against a bundled demo plan."""
+    plan_path, plan_text = _demo_plan_text(plan)
+    reviewer_instances = build_reviewers("mock", config_path=None)
+    diversity = analyze_reviewer_objects(reviewer_instances)
+    result = asyncio.run(
+        _run_review(
+            plan_path,
+            reviewer_instances,
+            run_round2=False,
+            plan_text=plan_text,
+            diversity=diversity,
+        )
+    )
+    run_dir = persist_run(out_dir, plan_path, plan_text, result)
+    if output_format == "pretty":
+        typer.echo(pretty_output(result, run_dir))
+    else:
+        typer.echo(json.dumps(json_output(result, run_dir), indent=2))
+
+    expected = Verdict.REVISE if plan == "bad" else Verdict.APPROVE
+    if result.merged_verdict != expected:
+        raise typer.Exit(_exit_code(result.merged_verdict))
 
 
 @app.command()

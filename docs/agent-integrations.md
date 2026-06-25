@@ -21,8 +21,7 @@ python -m pip install -e ".[dev]"
 Smoke test:
 
 ```bash
-# From a krystal-quorum checkout with examples:
-python -m krystal_quorum review examples/bad-plan.md --reviewers mock --format pretty
+krystal-quorum demo
 ```
 
 Install project-local agent integration files:
