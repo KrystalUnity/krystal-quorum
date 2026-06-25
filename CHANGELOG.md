@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 - 2026-06-25
+
+- Published Krystal Quorum to PyPI.
+- Restored the public Quickstart to the one-line PyPI install path.
+- Kept source checkout install documented as the development fallback.
+
 ## 0.6.1 - 2026-06-25
 
 - Fixed public install guidance to use a source checkout until the package is

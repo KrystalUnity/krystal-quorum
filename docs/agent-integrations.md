@@ -6,12 +6,10 @@ reviews a markdown plan before those tools implement it.
 
 ## Install
 
-Until Krystal Quorum is published to PyPI, install it from a source checkout:
+Install from PyPI:
 
 ```bash
-git clone https://github.com/KrystalUnity/krystal-quorum.git
-cd krystal-quorum
-python -m pip install .
+python -m pip install krystal-quorum
 ```
 
 For development from the checkout:
@@ -23,7 +21,7 @@ python -m pip install -e ".[dev]"
 Smoke test:
 
 ```bash
-# From a krystal-quorum checkout:
+# From a krystal-quorum checkout with examples:
 python -m krystal_quorum review examples/bad-plan.md --reviewers mock --format pretty
 ```
 

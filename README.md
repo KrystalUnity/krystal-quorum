@@ -17,12 +17,17 @@ Krystal Quorum is not an agent runtime and not a code generator. It is a review 
 
 ## Quickstart
 
-Until Krystal Quorum is published to PyPI, install it from a source checkout:
+Install from PyPI:
+
+```bash
+python -m pip install krystal-quorum
+```
+
+Clone the repo only if you want the bundled example plans:
 
 ```bash
 git clone https://github.com/KrystalUnity/krystal-quorum.git
 cd krystal-quorum
-python -m pip install .
 python -m krystal_quorum review examples/bad-plan.md --reviewers mock --format pretty
 ```
 
