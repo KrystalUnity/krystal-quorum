@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from importlib.resources import files
 from pathlib import Path
 from typing import Literal
@@ -11,6 +12,12 @@ import typer
 from krystal_quorum.config import build_reviewers
 from krystal_quorum.diversity import analyze_reviewer_objects
 from krystal_quorum.formatting import json_output, pretty_output
+from krystal_quorum.hosted import (
+    HostedReviewError,
+    hosted_json_output,
+    hosted_pack_from_reviewers,
+    run_hosted_review,
+)
 from krystal_quorum.init_command import InitError, available_targets, install_integration_templates
 from krystal_quorum.models import DiversityReport, ReconciledVerdict, Verdict
 from krystal_quorum.persist import persist_run
@@ -38,6 +45,13 @@ def _exit_code(verdict: Verdict) -> int:
     if verdict == Verdict.BLOCK:
         return 2
     return 3
+
+
+def _exit_code_for_value(verdict: str) -> int:
+    try:
+        return _exit_code(Verdict(str(verdict).upper()))
+    except ValueError:
+        return 3
 
 
 def _rough_token_estimate(text: str) -> int:
@@ -120,6 +134,16 @@ def review(
         "--format",
         help="Output format for stdout: json or pretty.",
     ),
+    api_token: str | None = typer.Option(
+        None,
+        "--api-token",
+        help="Quorum hosted API token. Falls back to KU_TOKEN.",
+    ),
+    api_base_url: str | None = typer.Option(
+        None,
+        "--api-base-url",
+        help="Hosted Quorum API base URL. Defaults to KRYSTAL_QUORUM_API_BASE or https://krystalunity.com.",
+    ),
 ) -> None:
     """Review a markdown coding plan."""
     if not plan.exists():
@@ -131,6 +155,32 @@ def review(
     if size_error:
         typer.echo(size_error, err=True)
         raise typer.Exit(3)
+
+    try:
+        hosted_pack = hosted_pack_from_reviewers(reviewers)
+    except HostedReviewError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(3) from exc
+    if hosted_pack:
+        resolved_token = (api_token or os.getenv("KU_TOKEN") or "").strip()
+        if not resolved_token:
+            typer.echo("--api-token or KU_TOKEN is required for hosted reviewers", err=True)
+            raise typer.Exit(3)
+        try:
+            response, run_dir = run_hosted_review(
+                plan_path=plan,
+                plan_text=plan_text,
+                pack_key=hosted_pack,
+                out_dir=out_dir,
+                api_token=resolved_token,
+                api_base_url=api_base_url,
+            )
+        except HostedReviewError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(3) from exc
+        output = hosted_json_output(response, run_dir)
+        typer.echo(json.dumps(output, indent=2))
+        raise typer.Exit(_exit_code_for_value(str(output.get("verdict") or "ABSTAIN")))
 
     try:
         reviewer_instances = build_reviewers(reviewers, config_path=config)

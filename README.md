@@ -214,6 +214,31 @@ $env:OPENAI_BASE_URL = "http://localhost:1234/v1"
 krystal-quorum review plan.md --reviewers openai:your-model
 ```
 
+### Hosted Quorum
+
+If you do not have local reviewers configured, use the paid hosted packs from
+Krystal Unity. Hosted mode submits the same markdown plan to the hosted Quorum
+service, polls for completion, and writes the normal local artifact directory.
+
+```bash
+export KU_TOKEN=kq_...
+krystal-quorum review plan.md --reviewers hosted:standard --api-token "$KU_TOKEN"
+```
+
+Hosted packs are exclusive in v1. Do not mix hosted and local reviewers in one
+command; run a local command-reviewer pass separately when you want both.
+
+```bash
+# Valid
+krystal-quorum review plan.md --reviewers hosted:quick --api-token "$KU_TOKEN"
+
+# Invalid in v1
+krystal-quorum review plan.md --reviewers hosted:standard,command:claude --api-token "$KU_TOKEN"
+```
+
+Use `--api-base-url` or `KRYSTAL_QUORUM_API_BASE` for staging or self-hosted KU
+control planes. The default is `https://krystalunity.com`.
+
 ### Local Command Reviewers
 
 Use `command:<name>` reviewers when you already have local coding agents or

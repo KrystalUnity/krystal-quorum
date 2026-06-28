@@ -209,6 +209,149 @@ def test_review_command_outputs_diversity_and_schema_version(tmp_path):
     assert '"diversity": "ok"' in result.output
 
 
+def test_hosted_review_requires_api_token(tmp_path, monkeypatch):
+    monkeypatch.delenv("KU_TOKEN", raising=False)
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Plan\n- Verify", encoding="utf-8")
+
+    result = CliRunner().invoke(app, ["review", str(plan), "--reviewers", "hosted:standard"])
+
+    assert result.exit_code == 3
+    assert "--api-token or KU_TOKEN is required for hosted reviewers" in result.output
+
+
+def test_hosted_review_rejects_mixed_local_reviewers(tmp_path):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Plan\n- Verify", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "hosted:standard,mock",
+            "--api-token",
+            "kq_test",
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert "hosted reviewers cannot be mixed with local reviewers" in result.output
+
+
+def test_hosted_review_submits_polls_and_persists_artifacts(tmp_path, monkeypatch):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Plan\n- Verify", encoding="utf-8")
+    out_dir = tmp_path / "reviews"
+    calls: list[tuple[str, str, dict | None]] = []
+
+    class FakeResponse:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            del kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, url, headers=None, json=None):
+            calls.append(("POST", url, json))
+            assert headers == {"Authorization": "Bearer kq_test"}
+            return FakeResponse(
+                {
+                    "id": "run-1",
+                    "status": "pending",
+                    "poll_url": "/api/quorum/reviews/run-1",
+                }
+            )
+
+        def get(self, url, headers=None):
+            calls.append(("GET", url, None))
+            assert headers == {"Authorization": "Bearer kq_test"}
+            return FakeResponse(
+                {
+                    "id": "run-1",
+                    "status": "completed",
+                    "verdict": "REVISE",
+                    "confidence": 0.82,
+                    "credits_charged": 3,
+                    "credits_remaining": 7,
+                    "reviewers": ["command:claude", "command:codex", "command:agy"],
+                    "reconciled": {
+                        "schema_version": "krystal-quorum.v0.6",
+                        "merged_verdict": "REVISE",
+                        "confidence": 0.82,
+                        "reviewers_used": ["command:claude", "command:codex", "command:agy"],
+                    },
+                    "artifacts": [
+                        {
+                            "name": "summary.md",
+                            "content_type": "text/markdown",
+                            "content": "# Summary\n",
+                        },
+                        {
+                            "name": "round1/command_claude.json",
+                            "content_type": "application/json",
+                            "content": "{}",
+                        },
+                    ],
+                }
+            )
+
+    monkeypatch.setattr("krystal_quorum.hosted.httpx.Client", FakeClient)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "hosted:standard",
+            "--api-token",
+            "kq_test",
+            "--api-base-url",
+            "https://ku.test",
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["verdict"] == "REVISE"
+    assert payload["credits_charged"] == 3
+    assert payload["credits_remaining"] == 7
+    run_dir = Path(payload["output_dir"])
+    assert (run_dir / "plan_input.md").read_text(encoding="utf-8") == "## Plan\n- Verify"
+    reconciled = json.loads((run_dir / "reconciled.json").read_text(encoding="utf-8"))
+    assert reconciled["merged_verdict"] == "REVISE"
+    assert (run_dir / "summary.md").read_text(encoding="utf-8") == "# Summary\n"
+    assert (run_dir / "round1" / "command_claude.json").read_text(encoding="utf-8") == "{}"
+    assert calls[0] == (
+        "POST",
+        "https://ku.test/api/quorum/reviews",
+        {
+            "plan_markdown": "## Plan\n- Verify",
+            "pack_key": "standard",
+            "source": "cli",
+            "client_version": "krystal-quorum/0.6.4",
+        },
+    )
+    assert calls[1] == ("GET", "https://ku.test/api/quorum/reviews/run-1", None)
+
+
 def test_review_command_pretty_format_outputs_terminal_card(tmp_path):
     plan = tmp_path / "plan.md"
     plan.write_text("Build a CLI with no success criteria.", encoding="utf-8")
