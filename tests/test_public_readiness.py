@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.6.4"
+    assert pyproject["project"]["version"] == "0.6.5"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
@@ -87,6 +87,24 @@ def test_public_docs_advertise_pypi_install() -> None:
     ]:
         text = path.read_text(encoding="utf-8")
         assert "python -m pip install krystal-quorum" in text
+
+
+def test_public_docs_explain_hosted_pack_rounds_and_pretty_output() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "--reviewers hosted:standard --api-token" in readme
+    assert "--format pretty" in readme
+    assert "Hosted packs choose their own reviewer mix and round strategy" in readme
+    assert "No credits are charged" in readme
+
+
+def test_github_action_docs_include_hosted_example() -> None:
+    action_readme = (REPO_ROOT / "integrations" / "github-action" / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "reviewers: hosted:quick" in action_readme
+    assert "KU_TOKEN: ${{ secrets.KU_TOKEN }}" in action_readme
 
 
 def test_integration_toml_templates_parse() -> None:

@@ -16,6 +16,7 @@ from krystal_quorum.hosted import (
     HostedReviewError,
     hosted_json_output,
     hosted_pack_from_reviewers,
+    hosted_pretty_output,
     run_hosted_review,
 )
 from krystal_quorum.init_command import InitError, available_targets, install_integration_templates
@@ -179,7 +180,10 @@ def review(
             typer.echo(str(exc), err=True)
             raise typer.Exit(3) from exc
         output = hosted_json_output(response, run_dir)
-        typer.echo(json.dumps(output, indent=2))
+        if output_format == "pretty":
+            typer.echo(hosted_pretty_output(response, run_dir))
+        else:
+            typer.echo(json.dumps(output, indent=2))
         raise typer.Exit(_exit_code_for_value(str(output.get("verdict") or "ABSTAIN")))
 
     try:

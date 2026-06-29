@@ -222,8 +222,17 @@ service, polls for completion, and writes the normal local artifact directory.
 
 ```bash
 export KU_TOKEN=kq_...
-krystal-quorum review plan.md --reviewers hosted:standard --api-token "$KU_TOKEN"
+krystal-quorum review plan.md --reviewers hosted:standard --api-token "$KU_TOKEN" --format pretty
 ```
+
+Hosted packs choose their own reviewer mix and round strategy on the server.
+The local `--round2` flag applies to BYO reviewer runs; use a larger hosted
+pack when you want broader hosted cross-review.
+
+No credits are charged when the hosted reviewer quorum collapses before a
+usable review is produced. The CLI exits with a configuration/error status and
+still writes the hosted response under `.krystal-quorum/reviews` so you can see
+what failed.
 
 Hosted packs are exclusive in v1. Do not mix hosted and local reviewers in one
 command; run a local command-reviewer pass separately when you want both.

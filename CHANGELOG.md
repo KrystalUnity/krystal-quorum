@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.5 - 2026-06-29
+
+- Added `--format pretty` support for hosted Quorum reviews.
+- Documented that hosted packs choose their own server-side reviewer mix and
+  round strategy.
+- Added a GitHub Action example for `hosted:quick` with a `KU_TOKEN` secret.
+- Persist hosted `failed_no_charge` responses locally and print an explicit
+  no-credit-charged message when hosted quorum collapses before a usable review.
+
+## 0.6.4 - 2026-06-28
+
+- Added hosted Quorum CLI mode with `hosted:quick`, `hosted:standard`, and
+  `hosted:council` reviewer packs.
+- Added hosted API token support through `--api-token` or `KU_TOKEN`.
+- Persisted hosted responses into the normal local artifact directory shape.
+- Rejected mixed hosted/local reviewer lists in the first hosted adapter pass.
+
 ## 0.6.3 - 2026-06-25
 
 - Added `krystal-quorum demo` for a no-clone, no-key bundled mock review.

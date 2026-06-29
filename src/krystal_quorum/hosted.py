@@ -5,6 +5,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from textwrap import shorten
 from typing import Any
 
 import httpx
@@ -17,7 +18,16 @@ TERMINAL_STATUSES = {"completed", "degraded", "failed_no_charge", "failed"}
 
 
 class HostedReviewError(ValueError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        response: dict[str, Any] | None = None,
+        run_dir: Path | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.response = response
+        self.run_dir = run_dir
 
 
 def hosted_pack_from_reviewers(reviewers: str) -> str | None:
@@ -81,8 +91,19 @@ def run_hosted_review(
                 raise HostedReviewError(f"hosted review poll failed: {exc}") from exc
             current = response.json()
 
-    if str(current.get("status") or "") in {"failed", "failed_no_charge"}:
-        raise HostedReviewError(str(current.get("error") or "hosted review failed"))
+    status = str(current.get("status") or "")
+    if status in {"failed", "failed_no_charge"}:
+        run_dir = _persist_hosted_response(
+            out_dir=out_dir,
+            plan_path=plan_path,
+            plan_text=plan_text,
+            response=current,
+        )
+        message = str(current.get("error") or "hosted review failed")
+        if status == "failed_no_charge":
+            message = f"{message}\nNo credits were charged."
+        message = f"{message}\nArtifacts: {run_dir}"
+        raise HostedReviewError(message, response=current, run_dir=run_dir)
     run_dir = _persist_hosted_response(
         out_dir=out_dir, plan_path=plan_path, plan_text=plan_text, response=current
     )
@@ -102,6 +123,76 @@ def hosted_json_output(response: dict[str, Any], run_dir: Path) -> dict[str, Any
         "credits_charged": response.get("credits_charged"),
         "credits_remaining": response.get("credits_remaining"),
     }
+
+
+def hosted_pretty_output(response: dict[str, Any], run_dir: Path, *, width: int = 78) -> str:
+    output = hosted_json_output(response, run_dir)
+    reconciled = response.get("reconciled") if isinstance(response.get("reconciled"), dict) else {}
+    verdict = str(output["verdict"])
+    confidence = _as_float(output.get("confidence"))
+    reviewers = output.get("reviewers_used") or ["hosted"]
+    status = str(output.get("status") or "unknown")
+    abstained = _string_list(reconciled.get("abstained_reviewers"))
+    unresolved = _string_list(reconciled.get("unresolved_for_human"))
+
+    lines = [
+        _rule("Krystal Quorum Hosted", width),
+        f"VERDICT: {verdict} | Confidence: {confidence:.2f}",
+        f"Reviewers: {', '.join(str(reviewer) for reviewer in reviewers)}",
+        f"Status: {status}",
+    ]
+    credits = _credits_line(output)
+    if credits:
+        lines.append(credits)
+    if abstained:
+        lines.append(f"Abstained: {', '.join(abstained)}")
+
+    lines.extend(["", _section("Human Triage", len(unresolved))])
+    if unresolved:
+        for item in unresolved:
+            lines.append("- " + shorten(item, width=max(20, width - 2), placeholder="..."))
+    else:
+        lines.append("- none")
+
+    lines.extend(["", f"Artifacts: {run_dir}", _rule("", width)])
+    return "\n".join(lines)
+
+
+def _as_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _credits_line(output: dict[str, Any]) -> str:
+    charged = output.get("credits_charged")
+    remaining = output.get("credits_remaining")
+    if charged is None and remaining is None:
+        return ""
+    if charged is None:
+        return f"Credits: remaining {remaining}"
+    if remaining is None:
+        return f"Credits: charged {charged}"
+    return f"Credits: charged {charged}, remaining {remaining}"
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _section(label: str, count: int) -> str:
+    return f"{label} ({count})"
+
+
+def _rule(title: str, width: int) -> str:
+    if not title:
+        return "+" + "-" * (width - 2) + "+"
+    label = f" {title} "
+    remaining = max(0, width - 2 - len(label))
+    return "+" + label + "-" * remaining + "+"
 
 
 def _absolute_url(base_url: str, poll_url: str) -> str:

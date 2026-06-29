@@ -346,10 +346,155 @@ def test_hosted_review_submits_polls_and_persists_artifacts(tmp_path, monkeypatc
             "plan_markdown": "## Plan\n- Verify",
             "pack_key": "standard",
             "source": "cli",
-            "client_version": "krystal-quorum/0.6.4",
+            "client_version": "krystal-quorum/0.6.5",
         },
     )
     assert calls[1] == ("GET", "https://ku.test/api/quorum/reviews/run-1", None)
+
+
+def test_hosted_review_pretty_format_outputs_terminal_card(tmp_path, monkeypatch):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Plan\n- Verify", encoding="utf-8")
+
+    class FakeResponse:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            del kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, url, headers=None, json=None):
+            del url, headers, json
+            return FakeResponse(
+                {
+                    "id": "run-1",
+                    "status": "completed",
+                    "verdict": "APPROVE",
+                    "confidence": 0.91,
+                    "credits_charged": 1,
+                    "credits_remaining": 19,
+                    "reviewers": ["hosted:quick"],
+                    "reconciled": {
+                        "abstained_reviewers": ["hosted:slow"],
+                        "unresolved_for_human": ["One reviewer abstained."],
+                    },
+                }
+            )
+
+    monkeypatch.setattr("krystal_quorum.hosted.httpx.Client", FakeClient)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "hosted:quick",
+            "--api-token",
+            "kq_test",
+            "--api-base-url",
+            "https://ku.test",
+            "--format",
+            "pretty",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Krystal Quorum Hosted" in result.output
+    assert "VERDICT: APPROVE" in result.output
+    assert "Reviewers: hosted:quick" in result.output
+    assert "Status: completed" in result.output
+    assert "Credits: charged 1, remaining 19" in result.output
+    assert "Abstained: hosted:slow" in result.output
+    assert "Human Triage (1)" in result.output
+    assert "One reviewer abstained." in result.output
+    assert "Artifacts:" in result.output
+    assert '"schema_version"' not in result.output
+
+
+def test_hosted_review_failed_no_charge_persists_response_and_says_no_credits(tmp_path, monkeypatch):
+    plan = tmp_path / "plan.md"
+    plan.write_text("## Plan\n- Verify", encoding="utf-8")
+    out_dir = tmp_path / "reviews"
+
+    class FakeResponse:
+        def __init__(self, payload: dict) -> None:
+            self.payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return self.payload
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            del kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args) -> None:
+            return None
+
+        def post(self, url, headers=None, json=None):
+            del url, headers, json
+            return FakeResponse(
+                {
+                    "id": "run-1",
+                    "status": "failed_no_charge",
+                    "error": "minimum usable quorum unavailable for quick: 0/2",
+                    "verdict": "REVISE",
+                    "credits_charged": 0,
+                    "reconciled": {
+                        "schema_version": "ku-quorum-hosted.v1",
+                        "merged_verdict": "REVISE",
+                        "abstained_reviewers": ["frontier-model-1", "specialised-coding-model-1"],
+                        "unresolved_for_human": [
+                            "All reviewers abstained; no usable review signal was produced."
+                        ],
+                    },
+                }
+            )
+
+    monkeypatch.setattr("krystal_quorum.hosted.httpx.Client", FakeClient)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--reviewers",
+            "hosted:quick",
+            "--api-token",
+            "kq_test",
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert "minimum usable quorum unavailable for quick: 0/2" in result.output
+    assert "No credits were charged." in result.output
+    assert "Artifacts:" in result.output
+    run_dirs = list(out_dir.glob("plan_*"))
+    assert len(run_dirs) == 1
+    persisted = json.loads((run_dirs[0] / "hosted-response.json").read_text(encoding="utf-8"))
+    assert persisted["status"] == "failed_no_charge"
+    assert persisted["credits_charged"] == 0
 
 
 def test_review_command_pretty_format_outputs_terminal_card(tmp_path):

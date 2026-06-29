@@ -37,4 +37,17 @@ For real reviewers:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
+For hosted Quorum packs, create a `KU_TOKEN` repository secret and pin the
+package spec to a published release:
+
+```yaml
+- uses: KrystalUnity/krystal-quorum/integrations/github-action@v0.6.5
+  with:
+    plan: docs/plans/change.md
+    reviewers: hosted:quick
+    package-spec: "krystal-quorum==0.6.5"
+  env:
+    KU_TOKEN: ${{ secrets.KU_TOKEN }}
+```
+
 Set `package-spec` to a pinned release when this action is copied into another repository.

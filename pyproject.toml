@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "krystal-quorum"
-version = "0.6.4"
+version = "0.6.5"
 description = "Preflight review for AI coding plans."
 readme = "README.md"
 requires-python = ">=3.11"
