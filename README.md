@@ -149,7 +149,7 @@ jobs:
 
 Set `reviewers` to Ollama, OpenAI-compatible, command, or hosted reviewers as
 needed. For reproducible CI, pin both the action tag and `package-spec`, for
-example `package-spec: krystal-quorum==0.6.5`.
+example `package-spec: krystal-quorum==0.6.6`.
 
 See [docs/agent-integrations.md](docs/agent-integrations.md#use-quorum-inside-ci)
 for API-backed and hosted examples.

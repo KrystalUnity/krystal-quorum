@@ -235,7 +235,7 @@ tag:
   with:
     plan: docs/plans/change.md
     reviewers: mock
-    package-spec: krystal-quorum==0.6.5
+    package-spec: krystal-quorum==0.6.6
 ```
 
 When testing changes from this repository checkout, use the development wrapper

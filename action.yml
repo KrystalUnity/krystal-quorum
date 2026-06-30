@@ -31,7 +31,7 @@ inputs:
   package-spec:
     description: Python package spec to install. Pin this for reproducible CI.
     required: false
-    default: krystal-quorum
+    default: krystal-quorum==0.6.6
   python-version:
     description: Python version installed by actions/setup-python.
     required: false

@@ -57,7 +57,7 @@ package spec to a published release:
   with:
     plan: docs/plans/change.md
     reviewers: hosted:quick
-    package-spec: "krystal-quorum==0.6.5"
+    package-spec: "krystal-quorum==0.6.6"
   env:
     KU_TOKEN: ${{ secrets.KU_TOKEN }}
 ```

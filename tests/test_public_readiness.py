@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.6.5"
+    assert pyproject["project"]["version"] == "0.6.6"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
@@ -142,7 +142,7 @@ def test_root_github_action_is_marketplace_ready() -> None:
         "reviewers:",
         "hosted:quick",
         "package-spec:",
-        "default: krystal-quorum",
+        "default: krystal-quorum==0.6.6",
         "uses: actions/setup-python@v5",
         'krystal-quorum "${args[@]}"',
         'echo "output-dir=$INPUT_OUT_DIR" >> "$GITHUB_OUTPUT"',

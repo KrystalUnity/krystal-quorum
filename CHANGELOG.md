@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.6 - 2026-06-30
+
+- Added a root GitHub Action for Marketplace-ready multi-AI plan review in CI.
+- Repositioned the public README and package metadata around multi-AI quorum
+  review before coding agents write code.
+- Updated GitHub Action docs to use the root action path and pinned
+  `krystal-quorum==0.6.6` package installs.
+
 ## 0.6.5 - 2026-06-29
 
 - Added `--format pretty` support for hosted Quorum reviews.
