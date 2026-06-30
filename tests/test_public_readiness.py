@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_pyproject_is_release_ready() -> None:
     pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.6.6"
+    assert pyproject["project"]["version"] == "0.6.7"
     assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
     assert pyproject["project"]["urls"]["Homepage"]
     assert pyproject["project"]["urls"]["Repository"]
@@ -104,7 +104,9 @@ def test_github_action_docs_include_hosted_example() -> None:
     )
 
     assert "reviewers: hosted:quick" in action_readme
-    assert "KU_TOKEN: ${{ secrets.KU_TOKEN }}" in action_readme
+    assert "api-token: ${{ secrets.KU_TOKEN }}" in action_readme
+    assert "output-dir" in action_readme
+    assert "latest-output-dir" in action_readme
 
 
 def test_integration_toml_templates_parse() -> None:
@@ -119,11 +121,19 @@ def test_github_action_exposes_expected_inputs() -> None:
     )
 
     for expected in [
+        "api-token:",
+        "api-base-url:",
+        "outputs:",
+        "latest-output-dir:",
         "package-spec:",
         "require-diversity:",
         "round2:",
         'default: "."',
+        "Mock reviewer only",
+        "set +e",
         'krystal-quorum "${args[@]}"',
+        'echo "output-dir=$INPUT_OUT_DIR" >> "$GITHUB_OUTPUT"',
+        'exit "$code"',
     ]:
         assert expected in action_text
 
@@ -141,11 +151,17 @@ def test_root_github_action_is_marketplace_ready() -> None:
         "plan:",
         "reviewers:",
         "hosted:quick",
+        "api-token:",
+        "api-base-url:",
         "package-spec:",
-        "default: krystal-quorum==0.6.6",
+        "default: krystal-quorum==0.6.7",
         "uses: actions/setup-python@v5",
+        "Mock reviewer only",
+        "set +e",
         'krystal-quorum "${args[@]}"',
         'echo "output-dir=$INPUT_OUT_DIR" >> "$GITHUB_OUTPUT"',
+        "latest-output-dir:",
+        'exit "$code"',
     ]:
         assert expected in action_text
 

@@ -4,10 +4,12 @@ The public action lives at the repository root and is the preferred way to use
 Krystal Quorum's multi-AI plan review from another repository:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.6
+- uses: KrystalUnity/krystal-quorum@v0.6.7
   with:
     plan: docs/plans/change.md
-    reviewers: mock
+    reviewers: hosted:quick
+    api-token: ${{ secrets.KU_TOKEN }}
+    package-spec: "krystal-quorum==0.6.7"
 ```
 
 This directory contains the development wrapper used when testing the action
@@ -26,12 +28,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./integrations/github-action
+      - id: quorum
+        uses: ./integrations/github-action
         with:
           plan: docs/plans/example.md
           reviewers: mock
           package-spec: "."
           round2: "false"
+      - name: Upload Quorum artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quorum-review
+          path: ${{ steps.quorum.outputs.output-dir }}
 ```
 
 Use provider API keys through normal GitHub Actions secrets when configuring non-mock reviewers.
@@ -39,7 +48,7 @@ Use provider API keys through normal GitHub Actions secrets when configuring non
 For real reviewers:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.6
+- uses: KrystalUnity/krystal-quorum@v0.6.7
   with:
     plan: docs/plans/change.md
     reviewers: openai:gpt-4.1,openai:o4-mini
@@ -53,14 +62,21 @@ For hosted Quorum packs, create a `KU_TOKEN` repository secret and pin the
 package spec to a published release:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.6
+- uses: KrystalUnity/krystal-quorum@v0.6.7
   with:
     plan: docs/plans/change.md
     reviewers: hosted:quick
-    package-spec: "krystal-quorum==0.6.6"
-  env:
-    KU_TOKEN: ${{ secrets.KU_TOKEN }}
+    api-token: ${{ secrets.KU_TOKEN }}
+    package-spec: "krystal-quorum==0.6.7"
 ```
+
+Use `reviewers: mock` only for no-secret structural smoke tests. The action
+prints a warning for mock-only runs because mock does not perform AI review.
+
+Outputs:
+
+- `output-dir`: the artifact root, available even when Quorum exits non-zero.
+- `latest-output-dir`: the newest per-run artifact directory when one exists.
 
 Set `package-spec` to a pinned release when this action is copied into another repository.
 

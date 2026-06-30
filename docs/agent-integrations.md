@@ -182,7 +182,9 @@ Use the instruction as a pre-implementation gate for markdown plans.
 ## Use Quorum Inside CI
 
 The repository includes a GitHub Action for multi-AI plan review. Use the root
-action from a pinned release when reviewing plans in another repository:
+action from a pinned release when reviewing plans in another repository. Hosted
+packs are the simplest CI path because GitHub runners usually do not have local
+models or local agent CLIs installed:
 
 ```yaml
 name: Review plan
@@ -197,16 +199,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: KrystalUnity/krystal-quorum@v0.6.6
+      - id: quorum
+        uses: KrystalUnity/krystal-quorum@v0.6.7
         with:
           plan: docs/plans/change.md
-          reviewers: mock
+          reviewers: hosted:quick
+          api-token: ${{ secrets.KU_TOKEN }}
+          package-spec: krystal-quorum==0.6.7
+      - name: Upload Quorum artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quorum-review
+          path: ${{ steps.quorum.outputs.output-dir }}
 ```
 
 For real API-backed reviewers:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.6
+- uses: KrystalUnity/krystal-quorum@v0.6.7
   with:
     plan: docs/plans/change.md
     reviewers: openai:gpt-4.1,openai:o4-mini
@@ -216,27 +227,34 @@ For real API-backed reviewers:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-For hosted Quorum packs, create a `KU_TOKEN` repository secret:
+For hosted Quorum packs, create a `KU_TOKEN` repository secret and pass it as
+the `api-token` input:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.6
+- uses: KrystalUnity/krystal-quorum@v0.6.7
   with:
     plan: docs/plans/change.md
     reviewers: hosted:quick
-  env:
-    KU_TOKEN: ${{ secrets.KU_TOKEN }}
+    api-token: ${{ secrets.KU_TOKEN }}
 ```
 
 For reproducible CI, pin the installed Python package as well as the action
 tag:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.6
+- uses: KrystalUnity/krystal-quorum@v0.6.7
   with:
     plan: docs/plans/change.md
     reviewers: mock
-    package-spec: krystal-quorum==0.6.6
+    package-spec: krystal-quorum==0.6.7
 ```
+
+`mock` is a no-secret structural smoke test only. It is useful for confirming
+the workflow is wired, but it is not a multi-AI review.
+
+The Action sets `output-dir` and `latest-output-dir` before returning the
+Quorum exit code, so `if: always()` follow-up steps can upload artifacts or
+post findings even when a `REVISE` or `BLOCK` verdict fails the check.
 
 When testing changes from this repository checkout, use the development wrapper
 at `integrations/github-action` and set `package-spec: "."`.

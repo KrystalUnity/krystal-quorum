@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.7 - 2026-06-30
+
+- Fixed the GitHub Action so artifact outputs are emitted even when Quorum
+  correctly exits non-zero for `REVISE`, `BLOCK`, or runtime errors.
+- Added first-class hosted Action inputs for `api-token` and `api-base-url`.
+- Added a `latest-output-dir` Action output for the newest per-run artifact
+  directory.
+- Made mock-only Action runs print a CI warning because `mock` is a structural
+  smoke test, not a real multi-AI review.
+
 ## 0.6.6 - 2026-06-30
 
 - Added a root GitHub Action for Marketplace-ready multi-AI plan review in CI.

@@ -141,15 +141,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: KrystalUnity/krystal-quorum@v0.6.6
+      - id: quorum
+        uses: KrystalUnity/krystal-quorum@v0.6.7
         with:
           plan: docs/plans/change.md
-          reviewers: mock
+          reviewers: hosted:quick
+          api-token: ${{ secrets.KU_TOKEN }}
+          package-spec: krystal-quorum==0.6.7
+      - name: Upload Quorum artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quorum-review
+          path: ${{ steps.quorum.outputs.output-dir }}
 ```
 
-Set `reviewers` to Ollama, OpenAI-compatible, command, or hosted reviewers as
-needed. For reproducible CI, pin both the action tag and `package-spec`, for
-example `package-spec: krystal-quorum==0.6.6`.
+Hosted reviewers are the cleanest path for CI runners because they usually do
+not have local models or local agent CLIs installed. Set `reviewers` to Ollama,
+OpenAI-compatible, command, or hosted reviewers as needed. For reproducible CI,
+pin both the action tag and `package-spec`, for example
+`package-spec: krystal-quorum==0.6.7`.
+
+For a no-secret wiring smoke test, use `reviewers: mock`. The Action prints a
+warning because `mock` is structural only; it does not perform real AI review.
+Action outputs include both `output-dir` and `latest-output-dir`, even when the
+review exits non-zero and correctly fails the check.
 
 See [docs/agent-integrations.md](docs/agent-integrations.md#use-quorum-inside-ci)
 for API-backed and hosted examples.

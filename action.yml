@@ -12,6 +12,14 @@ inputs:
     description: Comma-separated reviewer list, such as mock, ollama:model, openai:model, or hosted:quick.
     required: false
     default: mock
+  api-token:
+    description: Hosted Quorum API token. Prefer passing ${{ secrets.KU_TOKEN }}.
+    required: false
+    default: ""
+  api-base-url:
+    description: Optional hosted Quorum API base URL for staging or self-hosted control planes.
+    required: false
+    default: ""
   config:
     description: Optional krystal-quorum TOML config path.
     required: false
@@ -31,7 +39,7 @@ inputs:
   package-spec:
     description: Python package spec to install. Pin this for reproducible CI.
     required: false
-    default: krystal-quorum==0.6.6
+    default: krystal-quorum==0.6.7
   python-version:
     description: Python version installed by actions/setup-python.
     required: false
@@ -44,6 +52,9 @@ outputs:
   output-dir:
     description: Directory containing Krystal Quorum review artifacts.
     value: ${{ steps.run-quorum.outputs.output-dir }}
+  latest-output-dir:
+    description: Most recent per-run review artifact directory, when one was written.
+    value: ${{ steps.run-quorum.outputs.latest-output-dir }}
 runs:
   using: composite
   steps:
@@ -63,12 +74,24 @@ runs:
       env:
         INPUT_PLAN: ${{ inputs.plan }}
         INPUT_REVIEWERS: ${{ inputs.reviewers }}
+        INPUT_API_TOKEN: ${{ inputs.api-token }}
+        INPUT_API_BASE_URL: ${{ inputs.api-base-url }}
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_OUT_DIR: ${{ inputs.out-dir }}
         INPUT_ROUND2: ${{ inputs.round2 }}
         INPUT_REQUIRE_DIVERSITY: ${{ inputs.require-diversity }}
       run: |
+        if [ "$INPUT_REVIEWERS" = "mock" ]; then
+          echo "::warning title=Mock reviewer only::The mock reviewer is a structural smoke test, not a multi-AI review. Use hosted, Ollama, OpenAI-compatible, or command reviewers for real quorum review."
+        fi
+
         args=(review "$INPUT_PLAN" --reviewers "$INPUT_REVIEWERS" --out-dir "$INPUT_OUT_DIR")
+        if [ -n "$INPUT_API_TOKEN" ]; then
+          args+=(--api-token "$INPUT_API_TOKEN")
+        fi
+        if [ -n "$INPUT_API_BASE_URL" ]; then
+          args+=(--api-base-url "$INPUT_API_BASE_URL")
+        fi
         if [ -n "$INPUT_CONFIG" ]; then
           args+=(--config "$INPUT_CONFIG")
         fi
@@ -78,5 +101,27 @@ runs:
         if [ "$INPUT_REQUIRE_DIVERSITY" = "true" ]; then
           args+=(--require-diversity)
         fi
+
+        set +e
         krystal-quorum "${args[@]}"
+        code=$?
+        set -e
+
         echo "output-dir=$INPUT_OUT_DIR" >> "$GITHUB_OUTPUT"
+        latest_dir="$(python - <<'PY'
+from pathlib import Path
+import os
+
+root = Path(os.environ["INPUT_OUT_DIR"])
+if not root.exists():
+    print("")
+else:
+    run_dirs = [path for path in root.iterdir() if path.is_dir()]
+    print(max(run_dirs, key=lambda path: path.stat().st_mtime) if run_dirs else "")
+PY
+)"
+        if [ -n "$latest_dir" ]; then
+          echo "latest-output-dir=$latest_dir" >> "$GITHUB_OUTPUT"
+        fi
+
+        exit "$code"

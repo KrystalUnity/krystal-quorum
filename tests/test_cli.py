@@ -346,7 +346,7 @@ def test_hosted_review_submits_polls_and_persists_artifacts(tmp_path, monkeypatc
             "plan_markdown": "## Plan\n- Verify",
             "pack_key": "standard",
             "source": "cli",
-            "client_version": "krystal-quorum/0.6.6",
+            "client_version": "krystal-quorum/0.6.7",
         },
     )
     assert calls[1] == ("GET", "https://ku.test/api/quorum/reviews/run-1", None)
