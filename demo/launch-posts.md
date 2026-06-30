@@ -11,7 +11,7 @@ Primary links:
 
 Core positioning:
 
-> Krystal Quorum is a preflight sanity check for AI coding agents. It reviews the plan before the agent writes code.
+> Krystal Quorum is a multi-AI quorum review for coding-agent plans before the agent writes code.
 
 Use this framing everywhere:
 
@@ -206,7 +206,7 @@ Tweet 8:
 ```text
 The design goal:
 
-review the plan before agents edit code.
+multi-AI quorum review before agents write code.
 
 If you use Claude Code, Codex, Cursor, Aider, OpenCode, or local coding agents, I would love feedback on whether this review gate fits your workflow.
 ```
@@ -424,7 +424,7 @@ No. The consensus matcher is deterministic and explainable. It uses public match
 ### What is the evidence that this helps?
 
 ```text
-Right now it is a practical workflow tool, not a benchmark paper. The repo includes public benchmark fixtures and artifacts so people can inspect behavior. The claim I am comfortable making is narrower: it creates a repeatable pre-implementation review gate and catches common plan gaps early.
+Right now it is a practical workflow tool, not a benchmark paper. The repo includes public benchmark fixtures and artifacts so people can inspect behavior. The claim I am comfortable making is narrower: it creates a repeatable multi-AI plan review gate and catches common plan gaps early.
 ```
 
 ---

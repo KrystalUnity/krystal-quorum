@@ -4,20 +4,29 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 ```text
-+-- Krystal Quorum ------------------------+
-| Review the plan before agents edit code. |
-+------------------------------------------+
++-- Krystal Quorum --------------------------------+
+| Multi-AI quorum review before agents write code. |
++--------------------------------------------------+
 ```
 
 ![Krystal Quorum terminal demo](docs/assets/quorum-demo.svg)
 
-Review the plan before your AI coding agent creates the mess.
+Let multiple AIs pressure-test your coding agent's plan before it touches your
+codebase.
 
-Krystal Quorum is a local CLI that reviews markdown implementation plans with one or more independent reviewers, then writes a reconciled human-triage summary. It is designed for developers using AI coding agents who want to catch vague requirements, missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps, and test gaps before code is written.
+Krystal Quorum is a local CLI that sends a markdown implementation plan to a
+quorum of AI reviewers, then reconciles their findings into one
+human-triage summary. It is designed for developers using AI coding agents who
+want to catch vague requirements, missing acceptance criteria, contradictions,
+unsafe assumptions, rollback gaps, and test gaps before code is written.
+
+The magic is the quorum: one AI can propose the plan, but multiple reviewers can
+poke holes in it before your codebase pays the price.
 
 [Watch the 2-minute demo](https://youtu.be/6kcWH5NKS0Q)
 
-Krystal Quorum is not an agent runtime and not a code generator. It is a review step before implementation.
+Krystal Quorum is not an agent runtime and not a code generator. It is the
+multi-AI review gate before implementation.
 
 ## Quickstart
 
@@ -114,6 +123,36 @@ List supported targets with:
 ```bash
 krystal-quorum init --list-targets
 ```
+
+## GitHub Action
+
+Use Quorum as a multi-AI CI gate for markdown implementation plans:
+
+```yaml
+name: Review plan
+
+on:
+  pull_request:
+    paths:
+      - "docs/plans/**.md"
+
+jobs:
+  quorum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: KrystalUnity/krystal-quorum@v0.6.6
+        with:
+          plan: docs/plans/change.md
+          reviewers: mock
+```
+
+Set `reviewers` to Ollama, OpenAI-compatible, command, or hosted reviewers as
+needed. For reproducible CI, pin both the action tag and `package-spec`, for
+example `package-spec: krystal-quorum==0.6.5`.
+
+See [docs/agent-integrations.md](docs/agent-integrations.md#use-quorum-inside-ci)
+for API-backed and hosted examples.
 
 Example JSON output:
 

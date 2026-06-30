@@ -128,6 +128,28 @@ def test_github_action_exposes_expected_inputs() -> None:
         assert expected in action_text
 
 
+def test_root_github_action_is_marketplace_ready() -> None:
+    action_text = (REPO_ROOT / "action.yml").read_text(encoding="utf-8")
+
+    for expected in [
+        "name: Krystal Quorum Multi-AI Plan Review",
+        "author: Krystal Unity",
+        "description: Run a multi-AI quorum review",
+        "branding:",
+        "icon: check-circle",
+        "color: blue",
+        "plan:",
+        "reviewers:",
+        "hosted:quick",
+        "package-spec:",
+        "default: krystal-quorum",
+        "uses: actions/setup-python@v5",
+        'krystal-quorum "${args[@]}"',
+        'echo "output-dir=$INPUT_OUT_DIR" >> "$GITHUB_OUTPUT"',
+    ]:
+        assert expected in action_text
+
+
 def test_ci_tests_supported_python_versions() -> None:
     ci_text = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 

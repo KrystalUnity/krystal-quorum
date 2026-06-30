@@ -1,8 +1,8 @@
 # Agent Integrations
 
-Krystal Quorum is a pre-implementation review gate for AI coding agents. It does
+Krystal Quorum is a multi-AI quorum review gate for AI coding agents. It does
 not replace Claude Code, Hermes, OpenClaw, Codex, or local agent runners. It
-reviews a markdown plan before those tools implement it.
+sends a markdown plan to multiple reviewers before those tools implement it.
 
 ## Install
 
@@ -181,8 +181,8 @@ Use the instruction as a pre-implementation gate for markdown plans.
 
 ## Use Quorum Inside CI
 
-The repository includes a composite GitHub Action at
-`integrations/github-action`.
+The repository includes a GitHub Action for multi-AI plan review. Use the root
+action from a pinned release when reviewing plans in another repository:
 
 ```yaml
 name: Review plan
@@ -197,7 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./integrations/github-action
+      - uses: KrystalUnity/krystal-quorum@v0.6.6
         with:
           plan: docs/plans/change.md
           reviewers: mock
@@ -206,7 +206,7 @@ jobs:
 For real API-backed reviewers:
 
 ```yaml
-- uses: ./integrations/github-action
+- uses: KrystalUnity/krystal-quorum@v0.6.6
   with:
     plan: docs/plans/change.md
     reviewers: openai:gpt-4.1,openai:o4-mini
@@ -216,8 +216,30 @@ For real API-backed reviewers:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-When using the action outside this repository, set `package-spec` to a pinned
-published package once releases are available.
+For hosted Quorum packs, create a `KU_TOKEN` repository secret:
+
+```yaml
+- uses: KrystalUnity/krystal-quorum@v0.6.6
+  with:
+    plan: docs/plans/change.md
+    reviewers: hosted:quick
+  env:
+    KU_TOKEN: ${{ secrets.KU_TOKEN }}
+```
+
+For reproducible CI, pin the installed Python package as well as the action
+tag:
+
+```yaml
+- uses: KrystalUnity/krystal-quorum@v0.6.6
+  with:
+    plan: docs/plans/change.md
+    reviewers: mock
+    package-spec: krystal-quorum==0.6.5
+```
+
+When testing changes from this repository checkout, use the development wrapper
+at `integrations/github-action` and set `package-spec: "."`.
 
 ## Reviewer Templates
 
@@ -230,3 +252,4 @@ Templates live under `integrations/agent-templates/`:
 
 The command-reviewer template intentionally contains placeholder script paths.
 It does not include private Krystal Unity server paths, credentials, or wrappers.
+

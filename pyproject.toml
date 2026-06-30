@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "krystal-quorum"
 version = "0.6.5"
-description = "Preflight review for AI coding plans."
+description = "Multi-AI quorum review for AI coding plans."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

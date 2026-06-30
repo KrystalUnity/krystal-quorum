@@ -1,6 +1,17 @@
 # GitHub Action
 
-This wrapper runs the same local Krystal Quorum CLI inside GitHub Actions.
+The public action lives at the repository root and is the preferred way to use
+Krystal Quorum's multi-AI plan review from another repository:
+
+```yaml
+- uses: KrystalUnity/krystal-quorum@v0.6.6
+  with:
+    plan: docs/plans/change.md
+    reviewers: mock
+```
+
+This directory contains the development wrapper used when testing the action
+from a checkout of this repository.
 
 ```yaml
 name: Review plan
@@ -19,6 +30,7 @@ jobs:
         with:
           plan: docs/plans/example.md
           reviewers: mock
+          package-spec: "."
           round2: "false"
 ```
 
@@ -27,7 +39,7 @@ Use provider API keys through normal GitHub Actions secrets when configuring non
 For real reviewers:
 
 ```yaml
-- uses: ./integrations/github-action
+- uses: KrystalUnity/krystal-quorum@v0.6.6
   with:
     plan: docs/plans/change.md
     reviewers: openai:gpt-4.1,openai:o4-mini
@@ -41,7 +53,7 @@ For hosted Quorum packs, create a `KU_TOKEN` repository secret and pin the
 package spec to a published release:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum/integrations/github-action@v0.6.5
+- uses: KrystalUnity/krystal-quorum@v0.6.6
   with:
     plan: docs/plans/change.md
     reviewers: hosted:quick
@@ -51,3 +63,4 @@ package spec to a published release:
 ```
 
 Set `package-spec` to a pinned release when this action is copied into another repository.
+
