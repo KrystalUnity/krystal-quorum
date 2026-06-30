@@ -9,6 +9,8 @@
 +------------------------------------------+
 ```
 
+![Krystal Quorum terminal demo](docs/assets/quorum-demo.svg)
+
 Review the plan before your AI coding agent creates the mess.
 
 Krystal Quorum is a local CLI that reviews markdown implementation plans with one or more independent reviewers, then writes a reconciled human-triage summary. It is designed for developers using AI coding agents who want to catch vague requirements, missing acceptance criteria, contradictions, unsafe assumptions, rollback gaps, and test gaps before code is written.
