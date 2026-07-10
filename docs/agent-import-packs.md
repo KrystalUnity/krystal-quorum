@@ -1,6 +1,10 @@
 # Agent Import Packs
 
-Krystal Quorum ships project-local import packs for common AI coding agent workflows. Each pack installs a thin wrapper plus a shared Quorum review gate reference.
+Krystal Quorum ships project-local import packs for common AI coding agent
+workflows. Each pack automatically applies the same two-gate policy: a
+multi-AI quorum checks the commitment-bearing plan before coding, then checks
+whether the implementation kept its promises after normal tests. This is policy
+automation, not enforcement; the GitHub Action is the hard CI boundary.
 
 ## Supported Targets
 
@@ -12,6 +16,7 @@ Targets:
 
 - `claude-code`: Claude Code skill plus optional slash command.
 - `codex`: project-local Codex-style skill.
+- `copilot`: GitHub Copilot project skill.
 - `hermes`: Hermes-style plan review skill.
 - `claw`: alias for the OpenClaw-compatible pack.
 - `openclaw`: OpenClaw-style pre-dispatch review skill.
@@ -42,15 +47,39 @@ Every target installs:
 .krystal-quorum/agents/quorum-review.md
 ```
 
-That file defines the common review gate:
+That file defines the common two-gate workflow:
 
-1. Write or locate the markdown plan.
-2. Check that the plan includes goal, scope, acceptance criteria, rollback, verification, and risk notes.
-3. Run `krystal-quorum review <plan.md> --reviewers <reviewers> --round2 --format pretty`.
-4. Read the generated `summary.md`.
-5. Proceed only after handling `REVISE`, `BLOCK`, or collapsed quorum findings.
+1. Write or locate a markdown plan with recognized commitment sections.
+2. Use the project's configured real reviewer profile, or ask the human once
+   when no profile exists.
+3. Run a repository-bound plan review before edits and retain its
+   `approval.json` path on `APPROVE`.
+4. Implement only the approved scope and run the normal test suite.
+5. Run verified diff review with that same approval artifact and reviewer
+   profile.
+6. Remediate `REVISE` or `BLOCK`, or present unresolved human triage. Report
+   both verdicts and artifact paths.
 
-The target-specific files adapt that same workflow to each agent's expected import shape.
+The target-specific files adapt that workflow to each agent's expected import
+shape. They never automatically commit, push, or deploy. `mock` is for
+installation smoke tests only, not a real review.
+
+## Reviewers And Artifacts
+
+Use local command reviewers for installed coding agents, Ollama for local
+models, or API-compatible reviewers when the data boundary is acceptable.
+Reviewer artifacts can contain plans, patches, prompts, and findings: do not
+commit them or upload them casually. Verified local approvals are unsigned
+receipts, not identity attestations. Local diff review includes eligible
+untracked files by default and persists them locally with its artifacts. Use
+`--no-include-untracked` when those files must be omitted. External reviewers
+add a second boundary: captured untracked content requires the explicit
+`--allow-untracked-external` opt-in. Secret-looking input also requires an
+explicit external-review opt-in.
+
+GitHub Actions run standalone diff review against exact pull-request SHAs and
+therefore report unverified plan provenance in v0.7. Hosted diff review is
+excluded from this release.
 
 ## Output Shape
 

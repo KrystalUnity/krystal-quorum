@@ -1,3 +1,4 @@
+import errno
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from krystal_quorum.cli import app
         ),
         ("hermes", [".hermes/skills/krystal-quorum-plan-review/SKILL.md"]),
         ("codex", [".codex/skills/krystal-quorum-review/SKILL.md"]),
+        ("copilot", [".github/skills/krystal-quorum-review/SKILL.md"]),
         ("claw", [".openclaw/skills/krystal-quorum-openclaw-review/SKILL.md"]),
         ("openclaw", [".openclaw/skills/krystal-quorum-openclaw-review/SKILL.md"]),
         ("opencode", [".opencode/skills/krystal-quorum-review.md"]),
@@ -43,7 +45,16 @@ def test_init_command_lists_supported_targets() -> None:
     result = CliRunner().invoke(app, ["init", "--list-targets"])
 
     assert result.exit_code == 0
-    for target in ["claude-code", "codex", "hermes", "claw", "openclaw", "opencode", "all"]:
+    for target in [
+        "claude-code",
+        "codex",
+        "copilot",
+        "hermes",
+        "claw",
+        "openclaw",
+        "opencode",
+        "all",
+    ]:
         assert target in result.output
 
 
@@ -54,6 +65,7 @@ def test_init_command_installs_all_targets(tmp_path: Path) -> None:
     for expected_file in [
         ".claude/skills/krystal-quorum-review/SKILL.md",
         ".codex/skills/krystal-quorum-review/SKILL.md",
+        ".github/skills/krystal-quorum-review/SKILL.md",
         ".hermes/skills/krystal-quorum-plan-review/SKILL.md",
         ".openclaw/skills/krystal-quorum-openclaw-review/SKILL.md",
         ".opencode/skills/krystal-quorum-review.md",
@@ -93,3 +105,24 @@ def test_init_command_force_overwrites_existing_template(tmp_path: Path) -> None
 
     assert result.exit_code == 0
     assert "custom local workflow" not in existing.read_text(encoding="utf-8")
+
+
+def test_init_command_refuses_symlinked_destination_outside_path(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    escaped_parent = root / ".hermes"
+
+    try:
+        escaped_parent.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        if exc.errno in {errno.EACCES, errno.EPERM} or exc.winerror in {5, 1314}:
+            pytest.skip(f"Creating a directory symlink requires platform permission: {exc}")
+        raise
+
+    result = CliRunner().invoke(app, ["init", "--target", "hermes", "--path", str(root)])
+
+    assert result.exit_code == 3
+    assert "Refusing to write outside --path" in result.output
+    assert not (outside / "skills" / "krystal-quorum-plan-review" / "SKILL.md").exists()

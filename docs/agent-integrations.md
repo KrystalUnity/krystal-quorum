@@ -1,8 +1,11 @@
 # Agent Integrations
 
-Krystal Quorum is a multi-AI quorum review gate for AI coding agents. It does
-not replace Claude Code, Hermes, OpenClaw, Codex, or local agent runners. It
-sends a markdown plan to multiple reviewers before those tools implement it.
+Krystal Quorum is a two-gate, multi-AI review workflow for coding agents. It
+does not replace Claude Code, Hermes, OpenClaw, Codex, GitHub Copilot, or local
+agent runners. It reviews a commitment-bearing markdown plan before edits, then
+reviews the implementation diff against the approved plan after normal tests.
+Installed skills automate this policy; the GitHub Action is the hard CI
+enforcement layer.
 
 ## Install
 
@@ -30,6 +33,7 @@ Install project-local agent integration files:
 krystal-quorum init --list-targets
 krystal-quorum init --target claude-code
 krystal-quorum init --target codex
+krystal-quorum init --target copilot
 krystal-quorum init --target hermes
 krystal-quorum init --target claw
 krystal-quorum init --target openclaw
@@ -37,7 +41,7 @@ krystal-quorum init --target opencode
 krystal-quorum init --target all
 ```
 
-## Plan File Shape
+## Two-Gate Workflow
 
 Use a markdown plan with enough detail for independent review:
 
@@ -54,8 +58,22 @@ Use a markdown plan with enough detail for independent review:
 ## Risks and assumptions
 ```
 
-Quorum works with any markdown, but sparse plans produce better reviewer
-findings than approvals.
+Quorum recognizes commitments in these sections. For non-trivial work, the
+installed agent skill automatically follows this sequence:
+
+1. Write or locate the plan and use the configured real reviewer profile.
+   If no profile exists, ask the human once; `mock` is installation smoke-only.
+2. Run `review --bind-repo .` before edits. On `APPROVE`, retain the emitted
+   unsigned `approval.json`; on `REVISE` or `BLOCK`, revise and rerun or return
+   the unresolved decision to the human.
+3. Implement only the approved scope and run normal tests.
+4. Run `diff --approval <approval.json>` with the same reviewer profile.
+   Remediate a `REVISE` or `BLOCK`, or present human triage, then report both
+   gate verdicts and artifact paths.
+
+Do not automatically commit, push, or deploy. Reviewer artifacts can contain
+plans, patches, prompts, and findings, so keep them out of source control and
+choose explicitly before exposing secret-looking or untracked input.
 
 ## Verdict Handling
 
@@ -88,13 +106,14 @@ The command installs both the skill and optional slash-command style file:
 Typical Claude Code workflow:
 
 1. Ask Claude to draft or refine a plan in `docs/plans/<change>.md`.
-2. Invoke the skill or command, or ask Claude to run:
+2. Invoke the skill or command. It automatically applies the shared two-gate
+   workflow for non-trivial implementation:
 
 ```bash
-krystal-quorum review docs/plans/<change>.md --reviewers mock --format pretty
+krystal-quorum review docs/plans/<change>.md --bind-repo . --reviewers <real-reviewers>
 ```
 
-3. Replace `mock` with real reviewers before trusting the result.
+3. Keep the approval receipt, run normal tests, and run verified `diff` review.
 4. Continue only after handling `REVISE` or `BLOCK` findings.
 
 ## Use Quorum With Codex
@@ -115,6 +134,19 @@ The command installs:
 Ask Codex to run the skill before implementing a substantial plan. The shared
 workflow file under `.krystal-quorum/agents/` keeps the review gate consistent
 with the other agent packs.
+
+## Use Quorum With GitHub Copilot
+
+GitHub Copilot project skills live under `.github/skills/<skill-name>/SKILL.md`.
+Install the Copilot pack with:
+
+```bash
+krystal-quorum init --target copilot
+```
+
+It installs `.github/skills/krystal-quorum-review/SKILL.md` without pre-approved
+shell tools. The skill automatically delegates non-trivial work to the shared
+two-gate workflow while retaining human control.
 
 ## Use Quorum With Hermes
 
@@ -177,35 +209,38 @@ The command installs:
 .krystal-quorum/agents/quorum-review.md
 ```
 
-Use the instruction as a pre-implementation gate for markdown plans.
+Use the instruction to invoke the shared two-gate workflow for non-trivial
+implementation work.
 
 ## Use Quorum Inside CI
 
-The repository includes a GitHub Action for multi-AI plan review. Use the root
-action from a pinned release when reviewing plans in another repository. Hosted
-packs are the simplest CI path because GitHub runners usually do not have local
-models or local agent CLIs installed:
+The repository includes a GitHub Action for hard, standalone implementation
+diff enforcement. Use the root action from a pinned release with exact
+pull-request SHAs. It does not accept a local approval receipt and therefore
+reports `unverified_reference` provenance by design:
 
 ```yaml
-name: Review plan
+name: Review implementation evidence
 
 on:
   pull_request:
-    paths:
-      - "docs/plans/**.md"
-
 jobs:
   quorum:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - id: quorum
-        uses: KrystalUnity/krystal-quorum@v0.6.7
         with:
+          fetch-depth: 0
+      - id: quorum
+        uses: KrystalUnity/krystal-quorum@v0.7.0
+        with:
+          mode: diff
           plan: docs/plans/change.md
-          reviewers: hosted:quick
-          api-token: ${{ secrets.KU_TOKEN }}
-          package-spec: krystal-quorum==0.6.7
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          reviewers: openai:gpt-4.1,openai:o4-mini
+          include-untracked: "false"
+          package-spec: krystal-quorum==0.7.0
       - name: Upload Quorum artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -214,10 +249,17 @@ jobs:
           path: ${{ steps.quorum.outputs.output-dir }}
 ```
 
-For real API-backed reviewers:
+The Action is intentionally independent of agent skills and can fail even when
+an agent did not run its local two-gate policy. Keep upload artifacts private:
+they can contain reviewed plan and patch content. Hosted diff review is excluded
+from v0.7.
+
+For a local command, Ollama, or API-backed plan review, configure the reviewer
+profile used by the installed agent skill. For a standalone API-backed Action
+review, pass credentials as environment secrets:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.7
+- uses: KrystalUnity/krystal-quorum@v0.7.0
   with:
     plan: docs/plans/change.md
     reviewers: openai:gpt-4.1,openai:o4-mini
@@ -227,11 +269,12 @@ For real API-backed reviewers:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-For hosted Quorum packs, create a `KU_TOKEN` repository secret and pass it as
-the `api-token` input:
+Hosted Quorum packs remain available for plan-only review and are secondary to
+the local and standalone CI paths above. Create a `KU_TOKEN` repository secret
+only when intentionally selecting a hosted plan-review pack:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.7
+- uses: KrystalUnity/krystal-quorum@v0.7.0
   with:
     plan: docs/plans/change.md
     reviewers: hosted:quick
@@ -242,11 +285,11 @@ For reproducible CI, pin the installed Python package as well as the action
 tag:
 
 ```yaml
-- uses: KrystalUnity/krystal-quorum@v0.6.7
+- uses: KrystalUnity/krystal-quorum@v0.7.0
   with:
     plan: docs/plans/change.md
     reviewers: mock
-    package-spec: krystal-quorum==0.6.7
+    package-spec: krystal-quorum==0.7.0
 ```
 
 `mock` is a no-secret structural smoke test only. It is useful for confirming

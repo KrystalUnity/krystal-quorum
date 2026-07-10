@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from krystal_quorum.approval import ApprovalReceipt, canonical_json_sha256
 from krystal_quorum.models import ReconciledVerdict, ReviewIssue
 
 UNSAFE_FILENAME_CHARS = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -17,6 +18,14 @@ WINDOWS_RESERVED_NAMES = {
     *(f"COM{index}" for index in range(1, 10)),
     *(f"LPT{index}" for index in range(1, 10)),
 }
+
+
+class PersistenceError(RuntimeError):
+    """A persistence failure that retains any partially created run directory."""
+
+    def __init__(self, message: str, partial_path: Path | None = None) -> None:
+        super().__init__(message)
+        self.partial_path = partial_path
 
 
 def plan_sha256(plan_text: str) -> str:
@@ -111,29 +120,46 @@ def persist_run(
     plan_path: Path,
     plan_text: str,
     result: ReconciledVerdict,
+    receipt: ApprovalReceipt | None = None,
 ) -> Path:
-    run_dir = _run_dir(out_dir, plan_path)
-    (run_dir / "plan_input.md").write_text(plan_text, encoding="utf-8")
-    (run_dir / "plan_input.sha256").write_text(f"{result.plan_sha256}\n", encoding="utf-8")
-    (run_dir / "reconciled.json").write_text(
-        result.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
-    (run_dir / "summary.md").write_text(build_summary(result), encoding="utf-8")
+    reconciled_json = result.model_dump_json(indent=2)
+    if receipt is not None:
+        reconciled_payload = json.loads(reconciled_json)
+        if result.merged_verdict.value != "APPROVE":
+            raise PersistenceError("Approval receipt requires an APPROVE reconciliation")
+        if canonical_json_sha256(reconciled_payload) != receipt.reconciled_sha256:
+            raise PersistenceError("Approval receipt does not match reconciled result")
 
-    round1_dir = run_dir / "round1"
-    round1_dir.mkdir()
-    for output in result.round1_outputs:
-        (round1_dir / _reviewer_filename(output.reviewer)).write_text(
-            json.dumps(output.model_dump(mode="json"), indent=2),
-            encoding="utf-8",
+    run_dir: Path | None = None
+    try:
+        run_dir = _run_dir(out_dir, plan_path)
+        (run_dir / "plan_input.md").write_text(plan_text, encoding="utf-8")
+        (run_dir / "plan_input.sha256").write_text(
+            f"{result.plan_sha256}\n", encoding="utf-8"
         )
-    if result.round2_outputs:
-        round2_dir = run_dir / "round2"
-        round2_dir.mkdir()
-        for output in result.round2_outputs:
-            (round2_dir / _reviewer_filename(output.reviewer)).write_text(
+        (run_dir / "reconciled.json").write_text(reconciled_json, encoding="utf-8")
+        (run_dir / "summary.md").write_text(build_summary(result), encoding="utf-8")
+
+        round1_dir = run_dir / "round1"
+        round1_dir.mkdir()
+        for output in result.round1_outputs:
+            (round1_dir / _reviewer_filename(output.reviewer)).write_text(
                 json.dumps(output.model_dump(mode="json"), indent=2),
                 encoding="utf-8",
             )
+        if result.round2_outputs:
+            round2_dir = run_dir / "round2"
+            round2_dir.mkdir()
+            for output in result.round2_outputs:
+                (round2_dir / _reviewer_filename(output.reviewer)).write_text(
+                    json.dumps(output.model_dump(mode="json"), indent=2),
+                    encoding="utf-8",
+                )
+        if receipt is not None:
+            (run_dir / "approval.json").write_text(
+                receipt.model_dump_json(indent=2),
+                encoding="utf-8",
+            )
+    except OSError as exc:
+        raise PersistenceError(f"Could not persist review artifacts: {exc}", run_dir) from exc
     return run_dir

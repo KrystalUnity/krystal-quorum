@@ -1,12 +1,38 @@
 import asyncio
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 from typer.testing import CliRunner
 
 from krystal_quorum.cli import _run_review, app
 from krystal_quorum.models import ReviewerOutput, Verdict
+
+
+def _git(repo: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _bound_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "tests@example.com")
+    _git(repo, "config", "user.name", "Tests")
+    plan = repo / "docs" / "plan.md"
+    plan.parent.mkdir()
+    plan.write_text("## Acceptance Criteria\n- [AC-1] Works.\n", encoding="utf-8")
+    _git(repo, "add", "docs/plan.md")
+    _git(repo, "commit", "-m", "add plan")
+    return repo, plan, repo / ".krystal-quorum" / "reviews"
 
 
 def test_cli_help_runs():
@@ -28,6 +54,210 @@ def test_review_command_writes_output(tmp_path):
 
     assert result.exit_code == 1
     assert list(out_dir.glob("plan_*"))
+
+
+def test_bound_review_rejects_preflight_before_building_reviewers(tmp_path, monkeypatch):
+    repo, plan, out_dir = _bound_repo(tmp_path)
+    (repo / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+    called = False
+
+    def fail_if_called(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("reviewers must not be built before bound preflight")
+
+    monkeypatch.setattr("krystal_quorum.cli.build_reviewers", fail_if_called)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--bind-repo",
+            str(repo),
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert called is False
+    assert "clean" in result.output
+    assert not out_dir.exists()
+
+
+def test_bound_review_rejects_tracked_src_out_dir_before_building_reviewers(
+    tmp_path, monkeypatch
+):
+    repo, plan, _ = _bound_repo(tmp_path)
+    source = repo / "src" / "module.py"
+    source.parent.mkdir()
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    _git(repo, "add", "src/module.py")
+    _git(repo, "commit", "-m", "add source")
+    source.write_text("VALUE = 2\n", encoding="utf-8")
+    called = False
+
+    def fail_if_called(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("reviewers must not be built for tracked output directories")
+
+    monkeypatch.setattr("krystal_quorum.cli.build_reviewers", fail_if_called)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--bind-repo",
+            str(repo),
+            "--out-dir",
+            str(repo / "src"),
+        ],
+    )
+
+    assert result.exit_code == 3
+    assert called is False
+    assert "tracked path" in result.output
+    assert source.read_text(encoding="utf-8") == "VALUE = 2\n"
+    assert not list((repo / "src").glob("plan_*"))
+
+
+def test_bound_approve_writes_receipt_and_exposes_path(tmp_path):
+    repo, plan, out_dir = _bound_repo(tmp_path)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--bind-repo",
+            str(repo),
+            "--out-dir",
+            str(out_dir),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    approval_path = Path(payload["approval_path"])
+    assert approval_path.name == "approval.json"
+    assert approval_path.is_file()
+    assert json.loads(approval_path.read_text(encoding="utf-8"))["verdict"] == "APPROVE"
+
+
+def test_bound_revise_persists_without_receipt(tmp_path, monkeypatch):
+    repo, plan, out_dir = _bound_repo(tmp_path)
+
+    class RevisingReviewer:
+        id = "reviser"
+
+        async def review_round1(self, plan_text: str, *, timeout_s: int) -> ReviewerOutput:
+            del plan_text, timeout_s
+            return ReviewerOutput(
+                reviewer=self.id,
+                round=1,
+                verdict=Verdict.REVISE,
+                confidence=0.8,
+                blocking_issues=[],
+                suggestions=[],
+                per_clause={},
+                raw_response="{}",
+                elapsed_seconds=0.1,
+            )
+
+        async def review_round2(self, *args, **kwargs) -> ReviewerOutput:
+            del args, kwargs
+            raise AssertionError("round 2 was not requested")
+
+    monkeypatch.setattr(
+        "krystal_quorum.cli.build_reviewers",
+        lambda reviewers, config_path=None: [RevisingReviewer()],
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--bind-repo",
+            str(repo),
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert "approval_path" not in payload
+    run_dir = Path(payload["output_dir"])
+    assert not (run_dir / "approval.json").exists()
+
+
+def test_bound_post_review_mutation_persists_ordinary_run_without_receipt(
+    tmp_path, monkeypatch
+):
+    repo, plan, out_dir = _bound_repo(tmp_path)
+    original_run_review = _run_review
+
+    async def mutate_after_review(*args, **kwargs):
+        result = await original_run_review(*args, **kwargs)
+        (repo / "concurrent.txt").write_text("changed\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr("krystal_quorum.cli._run_review", mutate_after_review)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--bind-repo",
+            str(repo),
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 3
+    run_dirs = list(out_dir.glob("plan_*"))
+    assert len(run_dirs) == 1
+    assert (run_dirs[0] / "reconciled.json").is_file()
+    assert not (run_dirs[0] / "approval.json").exists()
+    assert "changed during review" in result.output
+
+
+def test_bound_persistence_failure_reports_partial_run_path(tmp_path, monkeypatch):
+    repo, plan, out_dir = _bound_repo(tmp_path)
+    original_write_text = Path.write_text
+
+    def fail_summary(self: Path, *args, **kwargs):
+        if self.name == "summary.md":
+            raise OSError("disk full")
+        return original_write_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_summary)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "review",
+            str(plan),
+            "--bind-repo",
+            str(repo),
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 3
+    run_dirs = list(out_dir.glob("plan_*"))
+    assert len(run_dirs) == 1
+    assert "Partial artifacts:" in result.output
+    assert str(run_dirs[0]) in result.output
 
 
 class CoordinatedReviewer:
@@ -346,7 +576,7 @@ def test_hosted_review_submits_polls_and_persists_artifacts(tmp_path, monkeypatc
             "plan_markdown": "## Plan\n- Verify",
             "pack_key": "standard",
             "source": "cli",
-            "client_version": "krystal-quorum/0.6.7",
+                "client_version": "krystal-quorum/0.7.0",
         },
     )
     assert calls[1] == ("GET", "https://ku.test/api/quorum/reviews/run-1", None)

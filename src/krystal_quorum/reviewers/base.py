@@ -3,11 +3,15 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Any, Protocol
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import ValidationError
 
 from krystal_quorum.models import ReviewIssue, ReviewerOutput, Verdict
+
+if TYPE_CHECKING:
+    from krystal_quorum.diff_models import DiffEvidenceFile, DiffReviewerOutput
 
 ISSUE_ALIASES = {
     "claim": ("claim", "description", "problem", "issue", "summary"),
@@ -35,6 +39,25 @@ class ReviewerProtocol(Protocol):
     async def review_round2(
         self, plan_text: str, round1_outputs: list[ReviewerOutput], *, timeout_s: int
     ) -> ReviewerOutput: ...
+
+    async def review_diff_round1(
+        self,
+        review_input: str,
+        commitments: Sequence[Any],
+        changed_files: Sequence[DiffEvidenceFile],
+        *,
+        timeout_s: int,
+    ) -> DiffReviewerOutput: ...
+
+    async def review_diff_round2(
+        self,
+        review_input: str,
+        commitments: Sequence[Any],
+        changed_files: Sequence[DiffEvidenceFile],
+        round1_outputs: list[DiffReviewerOutput],
+        *,
+        timeout_s: int,
+    ) -> DiffReviewerOutput: ...
 
 
 def fallback_output(

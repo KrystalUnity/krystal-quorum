@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 - 2026-07-10
+
+- Added automatic two-gate policy packs for Claude Code, Codex, GitHub Copilot,
+  Hermes, OpenClaw/Claw, and OpenCode.
+- Added the GitHub Copilot project skill at
+  `.github/skills/krystal-quorum-review/SKILL.md` without pre-approved tools.
+- Documented bound plan approval, verified implementation-diff review, unsigned
+  receipts, artifact sensitivity, and standalone CI provenance.
+- Expanded CI coverage to Ubuntu and Windows on Python 3.11/3.12 plus macOS on
+  Python 3.12.
+
 ## 0.6.7 - 2026-06-30
 
 - Fixed the GitHub Action so artifact outputs are emitted even when Quorum

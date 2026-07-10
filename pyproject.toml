@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "krystal-quorum"
-version = "0.6.7"
-description = "Multi-AI quorum review for AI coding plans."
+version = "0.7.0"
+description = "Multi-AI two-gate review for plans before coding and implementation evidence before merge."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -50,6 +50,7 @@ krystal_quorum = [
   "templates/agent_integrations/claude-code/.claude/commands/quorum-review.md",
   "templates/agent_integrations/claude-code/.claude/skills/krystal-quorum-review/SKILL.md",
   "templates/agent_integrations/codex/.codex/skills/krystal-quorum-review/SKILL.md",
+  "templates/agent_integrations/copilot/.github/skills/krystal-quorum-review/SKILL.md",
   "templates/agent_integrations/hermes/.hermes/skills/krystal-quorum-plan-review/SKILL.md",
   "templates/agent_integrations/openclaw/.openclaw/skills/krystal-quorum-openclaw-review/SKILL.md",
   "templates/agent_integrations/opencode/.opencode/skills/krystal-quorum-review.md",

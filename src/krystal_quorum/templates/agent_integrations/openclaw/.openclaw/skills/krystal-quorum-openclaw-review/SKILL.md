@@ -1,49 +1,15 @@
 ---
 name: krystal-quorum-openclaw-review
-description: Add a Krystal Quorum pre-dispatch review gate to OpenClaw-style agent workflows before implementation, tool execution, or multi-agent handoff of risky markdown coding plans.
+description: Automatically run Krystal Quorum's two-gate workflow before non-trivial OpenClaw implementation dispatch.
 ---
 
-# Krystal Quorum OpenClaw Review
+# Krystal Quorum Review
 
-Use this as a pre-dispatch gate before an OpenClaw-style coordinator assigns implementation work.
+For every non-trivial implementation task, automatically read and follow
+`.krystal-quorum/agents/quorum-review.md` before editing code or dispatching a
+worker. Keep the bound plan approval artifact and use it for the verified
+implementation-diff review.
 
-## Plan Shape
-
-Require a markdown plan with:
-
-- goal and scope
-- non-goals
-- implementation steps
-- acceptance criteria
-- rollback plan
-- verification commands
-- security, data, or operational risks
-
-## Review Gate
-
-Run Quorum before dispatch:
-
-```bash
-krystal-quorum review <plan.md> --reviewers <configured-reviewers> --round2
-```
-
-Recommended local-agent shape:
-
-```bash
-krystal-quorum review <plan.md> \
-  --config integrations/agent-templates/local-command-reviewers.toml \
-  --reviewers command:claude,command:codex,command:agy \
-  --round2 \
-  --require-diversity
-```
-
-## Verdict Handling
-
-- `APPROVE`: dispatch implementation with the reviewed plan attached.
-- `REVISE`: return the plan to the planner with the Quorum summary.
-- `BLOCK`: do not dispatch implementation; ask for human triage.
-- `ABSTAIN`: treat as inconclusive if too few reviewers produced usable output.
-
-Inspect `summary.md` for human-readable triage and `reconciled.json` for automation.
-
-Krystal Quorum is a review step. It is not an agent runtime and does not run tools.
+The shared workflow is policy automation, not enforcement. The GitHub Action
+is the hard enforcement boundary. Do not automatically commit, push, or deploy;
+report both gate verdicts and artifact paths for human control.

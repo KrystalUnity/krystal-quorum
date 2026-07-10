@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from krystal_quorum.cli import app
 from krystal_quorum.config import build_reviewers
 from krystal_quorum.models import Verdict
+from krystal_quorum.reviewer_specs import build_reviewers_from_specs, parse_reviewer_specs
 
 
 def _write_script(tmp_path: Path, body: str) -> Path:
@@ -307,6 +308,25 @@ def test_build_reviewers_loads_command_from_config(tmp_path):
     reviewers = build_reviewers("mock,command:echo", config_path=config)
 
     assert [reviewer.id for reviewer in reviewers] == ["mock", "command:echo"]
+
+
+def test_command_spec_drives_construction_and_family_metadata(tmp_path):
+    config = _write_config(
+        tmp_path,
+        name="codex",
+        command=[sys.executable, "-c", "print('unused')"],
+    )
+    config.write_text(
+        config.read_text(encoding="utf-8")
+        + '\nfamily = "local-codex"\ndata_boundary = "local"\n',
+        encoding="utf-8",
+    )
+
+    spec = parse_reviewer_specs("command:codex", config_path=config)[0]
+    reviewer = build_reviewers_from_specs([spec])[0]
+
+    assert reviewer.id == spec.reviewer_id
+    assert reviewer.family == spec.family == "local-codex"
 
 
 def test_build_reviewers_reports_missing_config_file(tmp_path):

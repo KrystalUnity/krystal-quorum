@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from pathlib import Path
 from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any, Callable
 
+from krystal_quorum.diff_models import DiffEvidenceFile, DiffReviewerOutput
+from krystal_quorum.diff_prompts import diff_round1_prompt, diff_round2_prompt
 from krystal_quorum.models import ReviewerOutput
 from krystal_quorum.prompts import round1_prompt, round2_prompt
 from krystal_quorum.reviewers.base import (
@@ -17,6 +20,14 @@ from krystal_quorum.reviewers.base import (
     parse_reviewer_output,
     retry_prompt,
 )
+from krystal_quorum.reviewers.diff_base import (
+    diff_fallback_output,
+    is_diff_parse_failure,
+    parse_diff_reviewer_output,
+)
+
+ReviewOutput = ReviewerOutput | DiffReviewerOutput
+FallbackFactory = Callable[..., ReviewOutput]
 
 
 class CommandReviewer:
@@ -51,15 +62,58 @@ class CommandReviewer:
     ) -> ReviewerOutput:
         return await self._review(round2_prompt(self.id, plan_text, round1_outputs), 2, timeout_s)
 
+    async def review_diff_round1(
+        self,
+        review_input: str,
+        commitments: Sequence[Any],
+        changed_files: Sequence[DiffEvidenceFile],
+        *,
+        timeout_s: int,
+    ) -> DiffReviewerOutput:
+        output = await self._review(
+            diff_round1_prompt(self.id, review_input, commitments),
+            1,
+            timeout_s,
+            commitments=commitments,
+            changed_files=changed_files,
+        )
+        assert isinstance(output, DiffReviewerOutput)
+        return output
+
+    async def review_diff_round2(
+        self,
+        review_input: str,
+        commitments: Sequence[Any],
+        changed_files: Sequence[DiffEvidenceFile],
+        round1_outputs: list[DiffReviewerOutput],
+        *,
+        timeout_s: int,
+    ) -> DiffReviewerOutput:
+        output = await self._review(
+            diff_round2_prompt(self.id, review_input, commitments, round1_outputs),
+            2,
+            timeout_s,
+            commitments=commitments,
+            changed_files=changed_files,
+        )
+        assert isinstance(output, DiffReviewerOutput)
+        return output
+
     async def _review(
         self,
         prompt: str,
         round_number: int,
         requested_timeout_s: float,
-    ) -> ReviewerOutput:
+        *,
+        commitments: Sequence[Any] | None = None,
+        changed_files: Sequence[DiffEvidenceFile] | None = None,
+    ) -> ReviewOutput:
         start = time.monotonic()
         command_timeout_s = self.timeout_s if self.timeout_s is not None else requested_timeout_s
         raw_attempts: list[str] = []
+        fallback_factory: FallbackFactory = (
+            fallback_output if commitments is None else diff_fallback_output
+        )
         for retries in range(PARSE_RETRIES + 1):
             attempt_prompt = prompt if retries == 0 else retry_prompt(prompt)
             raw = await self._run_command_once(
@@ -68,13 +122,17 @@ class CommandReviewer:
                 command_timeout_s,
                 start,
                 retries,
+                fallback_factory,
+                commitments,
             )
-            if isinstance(raw, ReviewerOutput):
+            if isinstance(raw, (ReviewerOutput, DiffReviewerOutput)):
                 return raw
             if not raw.strip():
-                return fallback_output(
-                    self.id,
-                    round_number,
+                fallback_args: list[Any] = [self.id, round_number]
+                if commitments is not None:
+                    fallback_args.append(commitments)
+                return fallback_factory(
+                    *fallback_args,
                     claim="reviewer command produced empty output",
                     evidence="command produced no stdout/stderr or output file text",
                     raw_response=raw,
@@ -82,20 +140,35 @@ class CommandReviewer:
                     retries=retries,
                 )
             raw_attempts.append(raw)
-            output = parse_reviewer_output(
-                self.id,
-                round_number,
-                raw,
-                elapsed_seconds=elapsed_since(start),
-                retries=retries,
-            )
+            if commitments is None:
+                output = parse_reviewer_output(
+                    self.id,
+                    round_number,
+                    raw,
+                    elapsed_seconds=elapsed_since(start),
+                    retries=retries,
+                )
+                parse_failed = is_parse_failure(output)
+            else:
+                output = parse_diff_reviewer_output(
+                    self.id,
+                    round_number,
+                    raw,
+                    elapsed_seconds=elapsed_since(start),
+                    retries=retries,
+                    commitments=commitments,
+                    changed_files=changed_files or (),
+                )
+                parse_failed = is_diff_parse_failure(output)
             if len(raw_attempts) > 1:
                 output.raw_response = combined_raw_attempts(raw_attempts)
-            if not is_parse_failure(output) or retries >= PARSE_RETRIES:
+            if not parse_failed or retries >= PARSE_RETRIES:
                 return output
-        return fallback_output(
-            self.id,
-            round_number,
+        fallback_args = [self.id, round_number]
+        if commitments is not None:
+            fallback_args.append(commitments)
+        return fallback_factory(
+            *fallback_args,
             claim="reviewer retry loop exhausted",
             elapsed_seconds=elapsed_since(start),
             retries=PARSE_RETRIES,
@@ -108,7 +181,12 @@ class CommandReviewer:
         command_timeout_s: float,
         start: float,
         retries: int,
-    ) -> str | ReviewerOutput:
+        fallback_factory: FallbackFactory,
+        commitments: Sequence[Any] | None,
+    ) -> str | ReviewOutput:
+        fallback_args: list[Any] = [self.id, round_number]
+        if commitments is not None:
+            fallback_args.append(commitments)
         try:
             if self.output_file is not None:
                 self.output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -130,9 +208,8 @@ class CommandReviewer:
                 process.kill()
                 stdout_bytes, stderr_bytes = await process.communicate()
                 raw = self._decode(stdout_bytes, stderr_bytes)
-                return fallback_output(
-                    self.id,
-                    round_number,
+                return fallback_factory(
+                    *fallback_args,
                     claim="reviewer command timeout",
                     evidence=f"timeout after {command_timeout_s:g}s",
                     raw_response=raw,
@@ -140,9 +217,8 @@ class CommandReviewer:
                     retries=retries,
                 )
         except Exception as exc:
-            return fallback_output(
-                self.id,
-                round_number,
+            return fallback_factory(
+                *fallback_args,
                 claim=f"reviewer command failed: {type(exc).__name__}",
                 evidence=str(exc),
                 elapsed_seconds=elapsed_since(start),

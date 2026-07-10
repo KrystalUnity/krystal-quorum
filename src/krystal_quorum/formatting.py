@@ -7,7 +7,12 @@ from typing import Any
 from krystal_quorum.models import ReconciledVerdict
 
 
-def json_output(result: ReconciledVerdict, run_dir: Path) -> dict[str, Any]:
+def json_output(
+    result: ReconciledVerdict,
+    run_dir: Path,
+    *,
+    approval_path: Path | None = None,
+) -> dict[str, Any]:
     output: dict[str, Any] = {
         "schema_version": result.schema_version,
         "verdict": result.merged_verdict.value,
@@ -27,10 +32,18 @@ def json_output(result: ReconciledVerdict, run_dir: Path) -> dict[str, Any]:
         output["round2_comparisons"] = [
             comparison.model_dump(mode="json") for comparison in result.round2_comparisons
         ]
+    if approval_path is not None:
+        output["approval_path"] = str(approval_path)
     return output
 
 
-def pretty_output(result: ReconciledVerdict, run_dir: Path, *, width: int = 78) -> str:
+def pretty_output(
+    result: ReconciledVerdict,
+    run_dir: Path,
+    *,
+    width: int = 78,
+    approval_path: Path | None = None,
+) -> str:
     lines = [
         _rule("Krystal Quorum", width),
         f"VERDICT: {result.merged_verdict.value} | Confidence: {result.confidence:.2f}",
@@ -75,7 +88,10 @@ def pretty_output(result: ReconciledVerdict, run_dir: Path, *, width: int = 78) 
     if result.round2_delta is not None:
         lines.append(f"Round 2 changed verdicts: {result.round2_delta}")
 
-    lines.extend(["", f"Artifacts: {run_dir}", _rule("", width)])
+    lines.append("")
+    if approval_path is not None:
+        lines.append(f"Approval: {approval_path}")
+    lines.extend([f"Artifacts: {run_dir}", _rule("", width)])
     return "\n".join(lines)
 
 

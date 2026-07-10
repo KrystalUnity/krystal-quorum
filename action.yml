@@ -5,6 +5,10 @@ branding:
   icon: check-circle
   color: blue
 inputs:
+  mode:
+    description: Action mode, either review for a plan gate or diff for implementation evidence.
+    required: false
+    default: review
   plan:
     description: Path to the markdown implementation plan.
     required: true
@@ -25,21 +29,57 @@ inputs:
     required: false
     default: ""
   out-dir:
-    description: Directory where review artifacts should be written.
+    description: Directory where review or diff artifacts should be written.
     required: false
     default: .krystal-quorum/reviews
   round2:
-    description: Run cross-audit round 2 for BYO local/API reviewers.
+    description: Run cross-audit round 2.
     required: false
     default: "false"
   require-diversity:
-    description: Fail closed when reviewer families are too similar.
+    description: Fail when reviewer families are too similar.
+    required: false
+    default: "false"
+  base:
+    description: Standalone diff base ref. Use the exact pull-request base SHA in CI.
+    required: false
+    default: ""
+  head:
+    description: Optional standalone diff head ref. Use the exact pull-request head SHA in CI.
+    required: false
+    default: ""
+  repo:
+    description: Git repository inspected in diff mode.
+    required: false
+    default: "."
+  max-diff-chars:
+    description: Maximum canonical diff characters accepted in diff mode.
+    required: false
+    default: "160000"
+  max-review-chars:
+    description: Maximum complete reviewer-input characters accepted in diff mode.
+    required: false
+    default: "220000"
+  context-lines:
+    description: Unified diff context lines, from 0 to 200.
+    required: false
+    default: "20"
+  include-untracked:
+    description: Include eligible untracked files in working-tree diff review.
+    required: false
+    default: "true"
+  allow-untracked-external:
+    description: Allow captured untracked content to be sent to external reviewers.
+    required: false
+    default: "false"
+  allow-secret-looking-input:
+    description: Allow warning-class input to be sent to external reviewers.
     required: false
     default: "false"
   package-spec:
     description: Python package spec to install. Pin this for reproducible CI.
     required: false
-    default: krystal-quorum==0.6.7
+    default: krystal-quorum==0.7.0
   python-version:
     description: Python version installed by actions/setup-python.
     required: false
@@ -53,8 +93,11 @@ outputs:
     description: Directory containing Krystal Quorum review artifacts.
     value: ${{ steps.run-quorum.outputs.output-dir }}
   latest-output-dir:
-    description: Most recent per-run review artifact directory, when one was written.
+    description: Run-specific artifact directory created by this invocation, when present.
     value: ${{ steps.run-quorum.outputs.latest-output-dir }}
+  summary-path:
+    description: Run-specific summary.md path created by this invocation, when present.
+    value: ${{ steps.run-quorum.outputs.summary-path }}
 runs:
   using: composite
   steps:
@@ -72,6 +115,7 @@ runs:
       id: run-quorum
       shell: bash
       env:
+        INPUT_MODE: ${{ inputs.mode }}
         INPUT_PLAN: ${{ inputs.plan }}
         INPUT_REVIEWERS: ${{ inputs.reviewers }}
         INPUT_API_TOKEN: ${{ inputs.api-token }}
@@ -80,48 +124,130 @@ runs:
         INPUT_OUT_DIR: ${{ inputs.out-dir }}
         INPUT_ROUND2: ${{ inputs.round2 }}
         INPUT_REQUIRE_DIVERSITY: ${{ inputs.require-diversity }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_HEAD: ${{ inputs.head }}
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_MAX_DIFF_CHARS: ${{ inputs.max-diff-chars }}
+        INPUT_MAX_REVIEW_CHARS: ${{ inputs.max-review-chars }}
+        INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
+        INPUT_INCLUDE_UNTRACKED: ${{ inputs.include-untracked }}
+        INPUT_ALLOW_UNTRACKED_EXTERNAL: ${{ inputs.allow-untracked-external }}
+        INPUT_ALLOW_SECRET_LOOKING_INPUT: ${{ inputs.allow-secret-looking-input }}
       run: |
         if [ "$INPUT_REVIEWERS" = "mock" ]; then
           echo "::warning title=Mock reviewer only::The mock reviewer is a structural smoke test, not a multi-AI review. Use hosted, Ollama, OpenAI-compatible, or command reviewers for real quorum review."
         fi
 
-        args=(review "$INPUT_PLAN" --reviewers "$INPUT_REVIEWERS" --out-dir "$INPUT_OUT_DIR")
-        if [ -n "$INPUT_API_TOKEN" ]; then
-          args+=(--api-token "$INPUT_API_TOKEN")
-        fi
-        if [ -n "$INPUT_API_BASE_URL" ]; then
-          args+=(--api-base-url "$INPUT_API_BASE_URL")
-        fi
-        if [ -n "$INPUT_CONFIG" ]; then
-          args+=(--config "$INPUT_CONFIG")
-        fi
-        if [ "$INPUT_ROUND2" = "true" ]; then
-          args+=(--round2)
-        fi
-        if [ "$INPUT_REQUIRE_DIVERSITY" = "true" ]; then
-          args+=(--require-diversity)
+        case "$INPUT_MODE" in
+          review)
+            args=(review "$INPUT_PLAN" --reviewers "$INPUT_REVIEWERS" --out-dir "$INPUT_OUT_DIR")
+            if [ -n "$INPUT_API_TOKEN" ]; then
+              args+=(--api-token "$INPUT_API_TOKEN")
+            fi
+            if [ -n "$INPUT_API_BASE_URL" ]; then
+              args+=(--api-base-url "$INPUT_API_BASE_URL")
+            fi
+            ;;
+          diff)
+            args=(diff --plan "$INPUT_PLAN" --base "$INPUT_BASE")
+            if [ -n "$INPUT_HEAD" ]; then
+              args+=(--head "$INPUT_HEAD")
+            fi
+            args+=(--repo "$INPUT_REPO" --reviewers "$INPUT_REVIEWERS" --out-dir "$INPUT_OUT_DIR")
+            ;;
+          *)
+            echo "::error title=Invalid mode::mode must be review or diff."
+            args=()
+            ;;
+        esac
+
+        if [ "${#args[@]}" -gt 0 ]; then
+          if [ -n "$INPUT_CONFIG" ]; then
+            args+=(--config "$INPUT_CONFIG")
+          fi
+          if [ "$INPUT_ROUND2" = "true" ]; then
+            args+=(--round2)
+          fi
+          if [ "$INPUT_REQUIRE_DIVERSITY" = "true" ]; then
+            args+=(--require-diversity)
+          fi
         fi
 
-        set +e
-        krystal-quorum "${args[@]}"
-        code=$?
-        set -e
+        if [ "$INPUT_MODE" = "diff" ]; then
+          args+=(--max-diff-chars "$INPUT_MAX_DIFF_CHARS")
+          args+=(--max-review-chars "$INPUT_MAX_REVIEW_CHARS")
+          args+=(--context-lines "$INPUT_CONTEXT_LINES")
+          if [ "$INPUT_INCLUDE_UNTRACKED" = "true" ]; then
+            args+=(--include-untracked)
+          else
+            args+=(--no-include-untracked)
+          fi
+          if [ "$INPUT_ALLOW_UNTRACKED_EXTERNAL" = "true" ]; then
+            args+=(--allow-untracked-external)
+          fi
+          if [ "$INPUT_ALLOW_SECRET_LOOKING_INPUT" = "true" ]; then
+            args+=(--allow-secret-looking-input)
+          fi
+        fi
 
         echo "output-dir=$INPUT_OUT_DIR" >> "$GITHUB_OUTPUT"
-        latest_dir="$(python - <<'PY'
-from pathlib import Path
-import os
+        before_dirs="$(python - <<'PY'
+        from pathlib import Path
+        import json
+        import os
 
-root = Path(os.environ["INPUT_OUT_DIR"])
-if not root.exists():
-    print("")
-else:
-    run_dirs = [path for path in root.iterdir() if path.is_dir()]
-    print(max(run_dirs, key=lambda path: path.stat().st_mtime) if run_dirs else "")
-PY
-)"
+        root = Path(os.environ["INPUT_OUT_DIR"])
+        try:
+            names = sorted(path.name for path in root.iterdir() if path.is_dir()) if root.exists() else []
+        except OSError:
+            print(json.dumps({"ok": False, "names": []}))
+        else:
+            print(json.dumps({"ok": True, "names": names}))
+        PY
+        )"
+
+        set +e
+        if [ "${#args[@]}" -eq 0 ]; then
+          code=3
+        else
+          krystal-quorum "${args[@]}"
+          code=$?
+        fi
+
+        latest_dir="$(BEFORE_DIRS="$before_dirs" python - <<'PY'
+        from pathlib import Path
+        import json
+        import os
+
+        root = Path(os.environ["INPUT_OUT_DIR"])
+        before_state = json.loads(os.environ["BEFORE_DIRS"])
+        run_dirs = []
+        if before_state["ok"]:
+            before = set(before_state["names"])
+            try:
+                run_dirs = (
+                    [path for path in root.iterdir() if path.is_dir() and path.name not in before]
+                    if root.exists()
+                    else []
+                )
+            except OSError:
+                run_dirs = []
+        latest = max(run_dirs, key=lambda path: (path.stat().st_mtime_ns, path.name), default=None)
+        print(latest.as_posix() if latest is not None else "")
+        PY
+        )"
+        summary_path=""
         if [ -n "$latest_dir" ]; then
           echo "latest-output-dir=$latest_dir" >> "$GITHUB_OUTPUT"
+          candidate_summary="$latest_dir/summary.md"
+          if [ -f "$candidate_summary" ]; then
+            summary_path="$candidate_summary"
+            echo "summary-path=$summary_path" >> "$GITHUB_OUTPUT"
+            cat "$summary_path" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        fi
+        if [ -z "$summary_path" ]; then
+          printf '## Krystal Quorum\n\nNo run-specific summary was produced; the command exited with code `%s`. Inspect the action log for the preflight or runtime error.\n' "$code" >> "$GITHUB_STEP_SUMMARY"
         fi
 
         exit "$code"

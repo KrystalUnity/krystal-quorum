@@ -5,6 +5,9 @@ from pathlib import Path
 import tomllib
 
 
+_VERSION_FALLBACK = "0.7.0"
+
+
 def _read_version() -> str:
     pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
     if pyproject.exists():
@@ -15,7 +18,7 @@ def _read_version() -> str:
     try:
         return version("krystal-quorum")
     except PackageNotFoundError:
-        return "0.0.0"
+        return _VERSION_FALLBACK
 
 
 __version__ = _read_version()

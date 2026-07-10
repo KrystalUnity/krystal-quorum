@@ -58,6 +58,24 @@ PLAN:
 
 When `--round2` is enabled, Quorum serializes non-abstained peer findings as JSON and asks each reviewer to cross-audit them against the same plan text. Reviewers return a fresh strict JSON verdict after considering peer findings.
 
+## Verified Diff Review
+
+The second workflow gate does not reuse a plan verdict as proof that code kept
+its promises. `krystal-quorum diff` compares recognized plan commitments with a
+captured implementation diff and asks the same configured reviewer profile for
+coverage evidence, scope findings, and unresolved human triage. With
+`--approval`, it validates an unsigned local approval receipt before reviewer
+execution; the receipt is an audit link, not a signature or identity claim.
+
+GitHub Action diff mode is intentionally standalone in v0.7 and reports
+unverified plan provenance from exact pull-request SHAs. Hosted diff review is
+excluded. Local diff review includes eligible untracked files by default and
+persists them locally with its artifacts; pass `--no-include-untracked` to omit
+them. External reviewers additionally require
+`--allow-untracked-external` before captured untracked content crosses the
+reviewer boundary. The CLI also checks secret-looking input before external
+review and requires its explicit opt-in.
+
 ## Parser Behavior
 
 - Tagged `<json>...</json>` payloads are preferred.

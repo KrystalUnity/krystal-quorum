@@ -55,6 +55,17 @@ TARGET_SPECS: dict[str, TargetSpec] = {
             ),
         ),
     ),
+    "copilot": TargetSpec(
+        name="copilot",
+        description="GitHub Copilot project skill",
+        templates=(
+            COMMON_TEMPLATE,
+            TemplateFile(
+                source="copilot/.github/skills/krystal-quorum-review/SKILL.md",
+                destination=".github/skills/krystal-quorum-review/SKILL.md",
+            ),
+        ),
+    ),
     "hermes": TargetSpec(
         name="hermes",
         description="Hermes-style plan review skill",

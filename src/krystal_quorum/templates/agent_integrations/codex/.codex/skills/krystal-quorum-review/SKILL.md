@@ -1,23 +1,14 @@
 ---
 name: krystal-quorum-review
-description: Run Krystal Quorum as a project-local pre-implementation review gate before Codex starts coding from a non-trivial markdown plan.
+description: Automatically run Krystal Quorum's two-gate workflow for non-trivial Codex implementation work.
 ---
 
 # Krystal Quorum Review
 
-Use this skill before implementation when the task is risky, ambiguous, user-visible, or depends on a markdown plan that should be reviewed before code changes.
+For every non-trivial implementation task, automatically read and follow
+`.krystal-quorum/agents/quorum-review.md` before editing code. Keep the bound
+plan approval artifact and use it for the verified implementation-diff review.
 
-## Workflow
-
-1. Write or locate the implementation plan.
-2. Ensure the plan has acceptance criteria, rollback, verification, and risks.
-3. Run:
-
-```bash
-krystal-quorum review <plan.md> --reviewers <reviewers> --round2 --format pretty
-```
-
-4. Read `.krystal-quorum/reviews/<run>/summary.md`.
-5. Continue only when Quorum returns `APPROVE`, or after the user accepts how to handle `REVISE` or `BLOCK`.
-
-For the canonical workflow, see `.krystal-quorum/agents/quorum-review.md`.
+The shared workflow is policy automation, not enforcement. The GitHub Action
+is the hard enforcement boundary. Do not automatically commit, push, or deploy;
+report both gate verdicts and artifact paths for human control.

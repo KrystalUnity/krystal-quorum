@@ -1,8 +1,15 @@
 import json
 from pathlib import Path
 
+import pytest
+
+from krystal_quorum.approval import (
+    ApprovalCommitment,
+    ApprovalReceipt,
+    canonical_json_sha256,
+)
 from krystal_quorum.models import ClauseStatus, ReviewerOutput, ReviewIssue, Verdict
-from krystal_quorum.persist import persist_run, plan_sha256
+from krystal_quorum.persist import PersistenceError, persist_run, plan_sha256
 from krystal_quorum.reconcile import reconcile
 
 
@@ -36,6 +43,86 @@ def test_persist_run_writes_expected_files(tmp_path: Path):
     assert (run_dir / "reconciled.json").exists()
     assert (run_dir / "summary.md").exists()
     assert (run_dir / "plan_input.sha256").read_text().strip() == plan_sha256(plan_text)
+
+
+def test_persist_run_reports_partial_path_after_write_failure(tmp_path: Path, monkeypatch):
+    plan_text = "## Acceptance\n- Works"
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text=plan_text,
+        reviewers_used=["mock"],
+        round1_outputs=[output()],
+        round2_outputs=[],
+    )
+    original_write_text = Path.write_text
+
+    def fail_summary(self: Path, *args, **kwargs):
+        if self.name == "summary.md":
+            raise OSError("disk full")
+        return original_write_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_summary)
+
+    with pytest.raises(PersistenceError, match="disk full") as caught:
+        persist_run(tmp_path, Path("plan.md"), plan_text, result)
+
+    assert caught.value.partial_path is not None
+    assert caught.value.partial_path.is_dir()
+    assert (caught.value.partial_path / "reconciled.json").is_file()
+
+
+def test_persist_run_reports_partial_path_when_approval_write_fails(
+    tmp_path: Path, monkeypatch
+):
+    plan_text = "## Acceptance\n- Works"
+    result = reconcile(
+        plan_path="plan.md",
+        plan_text=plan_text,
+        reviewers_used=["mock"],
+        round1_outputs=[output()],
+        round2_outputs=[],
+    )
+    receipt = ApprovalReceipt(
+        schema_version="krystal-quorum.approval.v1",
+        tool_version="0.7.0",
+        created_at=result.timestamp,
+        authenticity="unsigned",
+        verdict="APPROVE",
+        plan_path="plan.md",
+        plan_sha256=result.plan_sha256,
+        base_ref="HEAD",
+        base_sha="a" * 40,
+        reviewers_used=["mock"],
+        reviewer_families=["mock"],
+        diversity="ok",
+        reconciled_sha256=canonical_json_sha256(result.model_dump(mode="json")),
+        commitments=[
+            ApprovalCommitment(
+                id="AC-1",
+                category="acceptance",
+                text="Works",
+                source_line=2,
+            )
+        ],
+    )
+    original_write_text = Path.write_text
+
+    def fail_approval(self: Path, *args, **kwargs):
+        if self.name == "approval.json":
+            original_write_text(self, '{"schema_version":', encoding="utf-8")
+            raise OSError("approval write failed")
+        return original_write_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_approval)
+
+    with pytest.raises(PersistenceError, match="approval write failed") as caught:
+        persist_run(tmp_path, Path("plan.md"), plan_text, result, receipt=receipt)
+
+    assert caught.value.partial_path is not None
+    assert (caught.value.partial_path / "reconciled.json").is_file()
+    assert (caught.value.partial_path / "approval.json").read_text(encoding="utf-8") == (
+        '{"schema_version":'
+    )
 
 
 def test_persist_run_sanitizes_reviewer_filenames(tmp_path: Path):

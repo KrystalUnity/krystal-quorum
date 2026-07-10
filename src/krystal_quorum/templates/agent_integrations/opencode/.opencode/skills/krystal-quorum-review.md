@@ -1,24 +1,9 @@
 # Krystal Quorum Review
 
-Run Krystal Quorum before OpenCode-style implementation from a non-trivial markdown plan.
+For every non-trivial implementation task, automatically read and follow
+`.krystal-quorum/agents/quorum-review.md` before editing code. Keep the bound
+plan approval artifact and use it for the verified implementation-diff review.
 
-## Trigger
-
-Use this instruction when the plan changes code, data, auth, user-visible behavior, deployment behavior, or anything with unclear acceptance criteria.
-
-## Command
-
-```bash
-krystal-quorum review <plan.md> --reviewers <reviewers> --round2 --format pretty
-```
-
-Use `mock` only for smoke tests. For real review, configure diverse reviewers.
-
-## Gate
-
-- `APPROVE`: continue with implementation.
-- `REVISE`: revise the plan or ask the user before implementation.
-- `BLOCK`: stop until blockers are triaged.
-- `ABSTAIN`: rerun with working reviewers.
-
-Read `.krystal-quorum/agents/quorum-review.md` for the shared workflow.
+The shared workflow is policy automation, not enforcement. The GitHub Action
+is the hard enforcement boundary. Do not automatically commit, push, or deploy;
+report both gate verdicts and artifact paths for human control.

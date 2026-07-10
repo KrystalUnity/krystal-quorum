@@ -5,23 +5,26 @@
 
 ```text
 +-- Krystal Quorum --------------------------------+
-| Multi-AI quorum review before agents write code. |
+| Multi-AI gates before and after agents write code. |
 +--------------------------------------------------+
 ```
 
 ![Krystal Quorum terminal demo](docs/assets/quorum-demo.svg)
 
 Let multiple AIs pressure-test your coding agent's plan before it touches your
-codebase.
+codebase, then check whether the implementation kept the approved promises.
 
 Krystal Quorum is a local CLI that sends a markdown implementation plan to a
 quorum of AI reviewers, then reconciles their findings into one
-human-triage summary. It is designed for developers using AI coding agents who
-want to catch vague requirements, missing acceptance criteria, contradictions,
-unsafe assumptions, rollback gaps, and test gaps before code is written.
+human-triage summary. Its two-gate workflow checks a commitment-bearing plan
+before coding and reviews the implementation diff after normal tests. It is
+designed for developers using AI coding agents who want to catch vague
+requirements, missing acceptance criteria, contradictions, unsafe assumptions,
+rollback gaps, scope drift, and test gaps.
 
 The magic is the quorum: one AI can propose the plan, but multiple reviewers can
-poke holes in it before your codebase pays the price.
+poke holes in it before your codebase pays the price, and compare the final
+diff to the commitments it approved.
 
 [Watch the 2-minute demo](https://youtu.be/6kcWH5NKS0Q)
 
@@ -108,15 +111,19 @@ Install project-local skills or prompt files for the agents you already use:
 | --- | --- |
 | Claude Code | `krystal-quorum init --target claude-code` |
 | Codex | `krystal-quorum init --target codex` |
+| GitHub Copilot | `krystal-quorum init --target copilot` |
 | Hermes-style runners | `krystal-quorum init --target hermes` |
 | Claw / OpenClaw | `krystal-quorum init --target claw` |
 | OpenCode | `krystal-quorum init --target opencode` |
 | Everything | `krystal-quorum init --target all` |
 
 The packs share one workflow file at
-`.krystal-quorum/agents/quorum-review.md`, so every agent gets the same review
-gate. Details live in [docs/agent-integrations.md](docs/agent-integrations.md)
-and [docs/agent-import-packs.md](docs/agent-import-packs.md).
+`.krystal-quorum/agents/quorum-review.md`, so every agent gets the same
+automatic plan gate and verified diff gate. Skills are policy automation: they
+preserve human control and do not commit, push, or deploy. The GitHub Action is
+the hard enforcement layer. Details live in
+[docs/agent-integrations.md](docs/agent-integrations.md) and
+[docs/agent-import-packs.md](docs/agent-import-packs.md).
 
 List supported targets with:
 
@@ -126,28 +133,33 @@ krystal-quorum init --list-targets
 
 ## GitHub Action
 
-Use Quorum as a multi-AI CI gate for markdown implementation plans:
+Use Quorum as a standalone implementation-diff gate on pull requests:
 
 ```yaml
-name: Review plan
+name: Review implementation evidence
 
 on:
   pull_request:
-    paths:
-      - "docs/plans/**.md"
 
 jobs:
   quorum:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - id: quorum
-        uses: KrystalUnity/krystal-quorum@v0.6.7
         with:
+          fetch-depth: 0
+      - id: quorum
+        uses: KrystalUnity/krystal-quorum@v0.7.0
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          mode: diff
           plan: docs/plans/change.md
-          reviewers: hosted:quick
-          api-token: ${{ secrets.KU_TOKEN }}
-          package-spec: krystal-quorum==0.6.7
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          reviewers: openai:gpt-4.1,openai:o4-mini
+          include-untracked: "false"
+          package-spec: krystal-quorum==0.7.0
       - name: Upload Quorum artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -156,16 +168,27 @@ jobs:
           path: ${{ steps.quorum.outputs.output-dir }}
 ```
 
-Hosted reviewers are the cleanest path for CI runners because they usually do
-not have local models or local agent CLIs installed. Set `reviewers` to Ollama,
-OpenAI-compatible, command, or hosted reviewers as needed. For reproducible CI,
-pin both the action tag and `package-spec`, for example
-`package-spec: krystal-quorum==0.6.7`.
+Diff mode is intentionally standalone in v0.7 and reports
+`plan_provenance: unverified_reference`. It does not accept an approval receipt.
+The exact pull-request base and head SHAs plus `fetch-depth: 0` keep the reviewed
+range explicit. Hosted diff review is not enabled in v0.7; use supported local,
+command, Ollama, or OpenAI-compatible reviewers and provide their credentials as
+environment secrets. Do not commit or casually upload diff artifacts because
+they contain the reviewed plan and patch.
+
+The default `mode: review` preserves the plan-only gate. Hosted reviewers are a
+clean option for that mode on CI runners that do not have local models or agent
+CLIs installed; pass `reviewers: hosted:quick` and
+`api-token: ${{ secrets.KU_TOKEN }}`. Pin both the action tag and `package-spec`
+for reproducible CI.
 
 For a no-secret wiring smoke test, use `reviewers: mock`. The Action prints a
 warning because `mock` is structural only; it does not perform real AI review.
-Action outputs include both `output-dir` and `latest-output-dir`, even when the
-review exits non-zero and correctly fails the check.
+The Action always emits the artifact-root `output-dir`. When the current run
+creates artifacts, it also emits `latest-output-dir` and `summary-path` and
+appends `summary.md` to the GitHub step summary. Preflight failures append a
+concise note without reusing an older run directory. `REVISE`, `BLOCK`, and
+runtime exit codes still fail the check.
 
 See [docs/agent-integrations.md](docs/agent-integrations.md#use-quorum-inside-ci)
 for API-backed and hosted examples.
