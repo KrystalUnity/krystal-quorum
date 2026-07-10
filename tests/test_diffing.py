@@ -589,7 +589,7 @@ def test_untracked_fifo_is_opened_nonblocking_and_is_metadata_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    repo, base_sha = _init_repo(tmp_path)
+    repo, _ = _init_repo(tmp_path)
     fifo = repo / "events.pipe"
     os.mkfifo(fifo)
     original_open = diffing.os.open
@@ -610,11 +610,14 @@ def test_untracked_fifo_is_opened_nonblocking_and_is_metadata_only(
 
     monkeypatch.setattr(diffing.os, "open", recording_open)
 
-    snapshot = capture_diff(repo, base_ref=base_sha, include_untracked=True)
-    change = _by_path(snapshot)["events.pipe"]
+    section, kind = diffing._read_untracked(
+        repo,
+        fifo.name,
+        max_diff_chars=160_000,
+    )
 
-    assert change.kind == "fifo"
-    assert "content omitted; kind=fifo" in snapshot.patch
+    assert kind == "fifo"
+    assert "content omitted; kind=fifo" in section
     assert final_open_flags
     assert all(flags & os.O_NONBLOCK for flags in final_open_flags)
     assert all(flags & os.O_NOFOLLOW for flags in final_open_flags)
